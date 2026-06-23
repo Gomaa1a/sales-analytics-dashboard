@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dabboos — Top Regions</title>
+  <link rel="stylesheet" href="assets/css/style.css?v=13" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗺️</text></svg>" />
+</head>
+<body>
+  <header id="appHeader" class="app"></header>
+  <main class="wrap">
+    <div class="page-head">
+      <h1 id="pgTitle"></h1>
+      <p id="pgSub"></p>
+    </div>
+
+    <div class="filters"><input id="q" class="search-box" type="search" /></div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-head"><h2 id="chTitle"></h2></div>
+        <div class="panel-body"><div class="chart-box tall"><canvas id="regChart"></canvas></div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h2 id="tblTitle"></h2></div>
+        <div class="panel-body" style="padding:0"><div id="regTable"></div></div>
+      </div>
+    </div>
+    <div class="foot">Dabboos Sales Command Center · n8n + Odoo</div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="assets/js/config.js?v=13"></script>
+  <script src="assets/js/common.js?v=13"></script>
+  <script src="assets/js/order-modal.js?v=13"></script>
+  <script>
+  (function () {
+    const D = window.DASH;
+    D.buildChrome("regions");
+    document.getElementById("pgTitle").textContent = D.t("regions_title");
+    document.getElementById("pgSub").textContent = D.t("regions_sub");
+    document.getElementById("chTitle").textContent = D.t("regions_title");
+    document.getElementById("tblTitle").textContent = D.t("region");
+
+    let chart = null;
+    let lastData = null, q = "";
+    const PALETTE = ["#2563eb","#7c3aed","#16a34a","#d97706","#dc2626","#0891b2","#db2777","#65a30d","#9333ea","#0d9488"];
+    const qEl = document.getElementById("q");
+    qEl.placeholder = D.t("search_ph");
+    qEl.addEventListener("input", e => { q = e.target.value.trim().toLowerCase(); if (lastData) render(lastData); });
+
+    function render(d) {
+      const regions = (d.regions || []).filter(r => !q || String(r.city).toLowerCase().includes(q));
+      const top = regions.slice(0, 10);
+      const totalOrders = regions.reduce((s, r) => s + r.orders, 0) || 1;
+
+      // chart
+      const ctx = document.getElementById("regChart");
+      if (chart) chart.destroy();
+      chart = new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels: top.map(r => r.city),
+          datasets: [{ label: D.t("orders"), data: top.map(r => r.orders), backgroundColor: top.map((_, i) => PALETTE[i % PALETTE.length]), borderRadius: 6 }]
+        },
+        options: {
+          indexAxis: "y", maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => `${D.fmtNum(c.parsed.x)} ${D.t("orders")} · ${D.fmtMoney(top[c.dataIndex].value)}` } } },
+          scales: { x: { beginAtZero: true } }
+        }
+      });
+
+      // table
+      document.getElementById("regTable").innerHTML = regions.length ? `
+        <table class="dt">
+          <thead><tr><th>${D.t("region")}</th><th>${D.t("orders")}</th><th>${D.t("col_amount")}</th><th>${D.t("share")}</th><th>${D.t("crit_orders")}</th></tr></thead>
+          <tbody>
+          ${regions.map(r => `<tr>
+            <td class="strong">${r.city}</td>
+            <td>${D.fmtNum(r.orders)}</td>
+            <td class="amt">${D.fmtMoney(r.value)}</td>
+            <td class="muted">${Math.round(r.orders / totalOrders * 100)}%</td>
+            <td>${r.critical > 0 ? `<span class="badge b-crit">${D.fmtNum(r.critical)}</span>` : `<span class="muted">0</span>`}</td>
+          </tr>`).join("")}
+          </tbody>
+        </table>` : `<div class="empty">—</div>`;
+    }
+
+    async function tick() {
+      try {
+        const d = await D.api("regions");
+        D.setUpdated(d.generated_at);
+        document.getElementById("pgSub").textContent = D.t("regions_sub");
+        lastData = d;
+        render(d);
+      } catch (e) {
+        document.getElementById("regTable").innerHTML = `<div class="err">${D.t("error_load")}</div>`;
+      }
+    }
+    tick();
+    setInterval(tick, D.cfg.POLL_MS * 5);
+  })();
+  </script>
+</body>
+</html>

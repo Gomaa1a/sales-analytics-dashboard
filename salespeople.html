@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dabboos — Salespeople WoW</title>
+  <link rel="stylesheet" href="assets/css/style.css?v=13" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>" />
+</head>
+<body>
+  <header id="appHeader" class="app"></header>
+  <main class="wrap">
+    <div class="page-head">
+      <h1 id="pgTitle"></h1>
+      <p id="pgSub"></p>
+    </div>
+
+    <div class="filters"><input id="q" class="search-box" type="search" /></div>
+
+    <div class="panel">
+      <div class="panel-head"><h2 id="cmpTitle"></h2></div>
+      <div class="panel-body"><div class="chart-box tall"><canvas id="cmpChart"></canvas></div></div>
+    </div>
+
+    <div id="repCards" class="rep-grid"></div>
+    <div class="foot">Dabboos Sales Command Center · n8n + Odoo</div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="assets/js/config.js?v=13"></script>
+  <script src="assets/js/common.js?v=13"></script>
+  <script src="assets/js/order-modal.js?v=13"></script>
+  <script>
+  (function () {
+    const D = window.DASH;
+    D.buildChrome("sales");
+    document.getElementById("pgTitle").textContent = D.t("sales_title");
+    document.getElementById("pgSub").textContent = D.t("sales_sub");
+    document.getElementById("cmpTitle").textContent = D.t("sales_title") + " — " + D.t("wow");
+
+    let cmpChart = null;
+    const sparks = {};
+    let lastReps = null, lastLbl = null, q = "";
+    const qEl = document.getElementById("q");
+    qEl.placeholder = D.t("search_ph");
+    qEl.addEventListener("input", e => { q = e.target.value.trim().toLowerCase(); renderAll(); });
+
+    function tag(pct) {
+      const up = pct >= 0;
+      return `<span class="yoy-tag ${up ? "yoy-up" : "yoy-down"}">${up ? "▲" : "▼"} ${Math.abs(pct)}%</span>`;
+    }
+    // week-over-week from the 12-week series: last bucket = this week, the one before = last week
+    function lastWeekValue(r) {
+      const ws = r.weekly_series || [];
+      return ((ws[ws.length - 2] || {}).value) || 0;
+    }
+    function wowPct(r) {
+      const tw = (r.this_week && r.this_week.value) || 0;
+      const lw = lastWeekValue(r);
+      return lw > 0 ? Math.round((tw - lw) / lw * 100) : (tw > 0 ? 100 : 0);
+    }
+    function repCard(r, lbl) {
+      return `<div class="rep-card">
+        <div class="rep-head">
+          <div class="rep-name">${r.salesperson}</div>
+          <div class="rep-tags">
+            <span class="tag-lbl">${D.t("wow")}</span>${tag(wowPct(r))}
+            <span class="tag-lbl">${D.t("mom")}</span>${tag(r.mom_value_pct)}
+          </div>
+        </div>
+        <div class="rep-stats">
+          <div class="rep-stat"><div class="v">${D.fmtMoney(r.this_week.value)}</div><div class="l">${lbl.week}</div></div>
+          <div class="rep-stat"><div class="v">${D.fmtMoney(lastWeekValue(r))}</div><div class="l">${D.t("last_week")}</div></div>
+          <div class="rep-stat"><div class="v">${D.fmtMoney(r.this_month.value)}</div><div class="l">${lbl.month}</div></div>
+          <div class="rep-stat"><div class="v">${D.fmtMoney(r.last_month.value)}</div><div class="l">${lbl.lm}</div></div>
+        </div>
+        <div class="spark"><canvas id="spark_${r.user_id}"></canvas></div>
+      </div>`;
+    }
+
+    function renderCompare(reps, lbl) {
+      const top = reps.slice(0, 12);
+      const labels = top.map(r => r.salesperson);
+      const ds = [
+        { label: lbl.week, data: top.map(r => r.this_week.value), backgroundColor: "#2563eb", borderRadius: 5 },
+        { label: D.t("last_week"), data: top.map(r => lastWeekValue(r)), backgroundColor: "#cbd5e1", borderRadius: 5 }
+      ];
+      const ctx = document.getElementById("cmpChart");
+      if (cmpChart) cmpChart.destroy();
+      cmpChart = new Chart(ctx, {
+        type: "bar",
+        data: { labels, datasets: ds },
+        options: {
+          maintainAspectRatio: false,
+          plugins: { legend: { position: "top" }, tooltip: { callbacks: { label: c => c.dataset.label + ": " + D.fmtMoneyFull(c.parsed.y) } } },
+          scales: { y: { ticks: { callback: v => D.fmtMoney(v) } } }
+        }
+      });
+    }
+
+    function renderSparks(reps) {
+      reps.slice(0, 60).forEach(r => {
+        const el = document.getElementById("spark_" + r.user_id);
+        if (!el) return;
+        if (sparks[r.user_id]) sparks[r.user_id].destroy();
+        sparks[r.user_id] = new Chart(el, {
+          type: "line",
+          data: {
+            labels: r.weekly_series.map(w => w.label),
+            datasets: [{ data: r.weekly_series.map(w => w.value), borderColor: "#2563eb", backgroundColor: "rgba(37,99,235,.12)", fill: true, tension: .35, pointRadius: 0, borderWidth: 2 }]
+          },
+          options: { maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => D.fmtMoney(c.parsed.y) } } }, scales: { x: { display: false }, y: { display: false } } }
+        });
+      });
+    }
+
+    function renderAll() {
+      if (!lastReps) return;
+      let reps = q ? lastReps.filter(r => String(r.salesperson).toLowerCase().includes(q)) : lastReps;
+      reps = [...reps].sort((a, b) => ((b.this_week && b.this_week.value) || 0) - ((a.this_week && a.this_week.value) || 0));
+      renderCompare(reps, lastLbl);
+      document.getElementById("repCards").innerHTML = reps.length
+        ? reps.map(r => repCard(r, lastLbl)).join("")
+        : `<div class="empty">—</div>`;
+      renderSparks(reps);
+    }
+
+    async function tick() {
+      try {
+        const d = await D.api("salespeople");
+        D.setUpdated(d.generated_at);
+        lastLbl = D.isAR()
+          ? { week: d.labels.week_ar, month: d.labels.month_ar, lm: d.labels.lm_ar, ly: d.labels.ly_ar }
+          : { week: d.labels.week_en, month: d.labels.month_en, lm: d.labels.lm_en, ly: d.labels.ly_en };
+        lastReps = d.reps;
+        renderAll();
+      } catch (e) {
+        document.getElementById("repCards").innerHTML = `<div class="err">${D.t("error_load")}</div>`;
+      }
+    }
+    tick();
+    setInterval(tick, D.cfg.POLL_MS * 5);
+  })();
+  </script>
+</body>
+</html>

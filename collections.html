@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dabboos — Daily Collections</title>
+  <link rel="stylesheet" href="assets/css/style.css?v=13" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💵</text></svg>" />
+</head>
+<body>
+  <header id="appHeader" class="app"></header>
+  <main class="wrap">
+    <div class="page-head">
+      <h1 id="pgTitle"></h1>
+      <p id="pgSub"></p>
+    </div>
+
+    <div id="kpis" class="kpi-grid"></div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-head"><h2 id="lbTitle"></h2></div>
+        <div class="panel-body"><div id="leaderBox"></div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h2 id="gridTitle"></h2></div>
+        <div class="panel-body"><div class="coll-wrap"><div id="gridBox"></div></div></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2 id="debtTitle"></h2></div>
+      <div class="panel-body">
+        <div id="debtKpis" class="kpi-grid"></div>
+        <div class="filters">
+          <label class="fb-field"><span id="debtPickLbl"></span>
+            <select id="debtRep" class="fb-sel"></select></label>
+          <span id="debtTotals" class="fb-count"></span>
+        </div>
+        <div id="debtBox"></div>
+      </div>
+    </div>
+
+    <div class="foot">Dabboos Sales Command Center · Odoo → n8n → Supabase</div>
+  </main>
+
+  <script src="assets/js/config.js?v=13"></script>
+  <script src="assets/js/common.js?v=13"></script>
+  <script src="assets/js/order-modal.js?v=13"></script>
+  <script>
+  (function () {
+    const D = window.DASH;
+    D.buildChrome("collections");
+    document.getElementById("pgTitle").textContent = D.t("coll_title");
+    document.getElementById("pgSub").textContent = D.t("coll_sub");
+    document.getElementById("lbTitle").textContent = D.t("coll_leaderboard");
+    document.getElementById("gridTitle").textContent = D.t("coll_grid");
+    document.getElementById("debtTitle").textContent = D.t("debt_title");
+    document.getElementById("debtPickLbl").textContent = D.t("debt_pick");
+
+    const kpi = (cls, label, num, sub) =>
+      `<div class="kpi ${cls}"><div class="kpi-l">${label}</div><div class="kpi-n">${num}</div><div class="kpi-sub">${sub || "&nbsp;"}</div></div>`;
+    // 'YYYY-MM-DD' -> 'DD/MM'
+    const dayLabel = d => d ? (d.slice(8, 10) + "/" + d.slice(5, 7)) : "";
+
+    function renderLeader(snap) {
+      const reps = (snap.reps || []).filter(r => r.today && r.today.total > 0);
+      const box = document.getElementById("leaderBox");
+      if (!reps.length) { box.innerHTML = `<div class="empty">${D.t("no_data")}</div>`; return; }
+      const max = Math.max(1, ...reps.map(r => r.today.total));
+      const legend = `<div class="coll-legend">
+        <span><i style="background:var(--grn)"></i>${D.t("coll_paid")}</span>
+        <span><i style="background:var(--amb)"></i>${D.t("coll_pending")}</span></div>`;
+      box.innerHTML = legend + reps.map(r => {
+        const paidW = Math.round(r.today.paid / max * 100);
+        const pendW = Math.round(r.today.pending / max * 100);
+        return `<div class="barline">
+          <div class="barline-h">
+            <span>${r.salesperson}</span>
+            <span class="muted"><b>${D.fmtMoney(r.today.total)}</b> · <span style="color:var(--grn)">${D.fmtMoney(r.today.paid)}</span> + <span style="color:var(--amb)">${D.fmtMoney(r.today.pending)}</span></span>
+          </div>
+          <div class="coll-bar"><div class="coll-seg-paid" style="width:${paidW}%"></div><div class="coll-seg-pend" style="width:${pendW}%"></div></div>
+        </div>`;
+      }).join("");
+    }
+
+    function renderGrid(snap) {
+      const days = snap.days || [];
+      const reps = snap.reps || [];
+      const today = snap.today;
+      const tbd = snap.totals_by_day || {};
+      const box = document.getElementById("gridBox");
+      if (!reps.length) { box.innerHTML = `<div class="empty">${D.t("no_data")}</div>`; return; }
+      box.innerHTML = `
+        <table class="dt coll-grid">
+          <thead><tr>
+            <th>${D.t("col_rep")}</th>
+            ${days.map(d => `<th class="day${d === today ? " today" : ""}">${dayLabel(d)}</th>`).join("")}
+            <th>${D.t("coll_total")}</th>
+          </tr></thead>
+          <tbody>
+          ${reps.map(r => `<tr>
+            <td class="strong">${r.salesperson}</td>
+            ${days.map(d => {
+              const c = (r.daily && r.daily[d]) || { total: 0, pending: 0 };
+              return `<td class="cell${d === today ? " today" : ""}">${c.total ? D.fmtMoney(c.total) : "—"}${c.pending ? `<div class="c-pend">${D.fmtMoney(c.pending)} ${D.t("coll_pending")}</div>` : ""}</td>`;
+            }).join("")}
+            <td class="cell strong">${D.fmtMoney(r.total)}</td>
+          </tr>`).join("")}
+          </tbody>
+          <tfoot><tr>
+            <td>${D.t("coll_grand_total")}</td>
+            ${days.map(d => `<td class="cell${d === today ? " today" : ""}">${(tbd[d] && tbd[d].total) ? D.fmtMoney(tbd[d].total) : "—"}</td>`).join("")}
+            <td class="cell">${D.fmtMoney(snap.grand_total)}</td>
+          </tr></tfoot>
+        </table>`;
+    }
+
+    // ----- outstanding customer debt (with salesperson filter) -----
+    const DEBT_ALL = "__all__";
+    let debt = null, debtRep = DEBT_ALL;
+    const repKey = r => String(r.user_id != null ? r.user_id : r.salesperson);
+    document.getElementById("debtRep").addEventListener("change", e => { debtRep = e.target.value; renderDebt(); });
+
+    function renderDebt() {
+      const reps = (debt && debt.reps) || [];
+      const box = document.getElementById("debtBox");
+      const kbox = document.getElementById("debtKpis");
+      if (!reps.length) {
+        kbox.innerHTML = ""; box.innerHTML = `<div class="empty">${D.t("no_data")}</div>`;
+        document.getElementById("debtTotals").textContent = ""; return;
+      }
+      // scope: all reps, or just the selected one
+      const scoped = debtRep === DEBT_ALL ? reps : reps.filter(x => repKey(x) === debtRep);
+
+      // KPIs recalculate for the current scope
+      const totalReceivable = scoped.reduce((s, r) => s + (r.receivable_total || 0), 0);
+      const totalDue = scoped.reduce((s, r) => s + (r.overdue_total || 0), 0);
+      const duePct = totalReceivable > 0 ? Math.round(totalDue / totalReceivable * 100) : 0;
+      kbox.innerHTML =
+        kpi("k-vio", D.t("debt_total_all"), D.fmtMoney(totalReceivable), debtRep === DEBT_ALL ? D.t("debt_all_reps_sub") : "&nbsp;") +
+        kpi("k-red", D.t("debt_due_all"), D.fmtMoney(totalDue), D.t("debt_due_sub")) +
+        kpi("k-amb", D.t("debt_due_pct"), duePct + "%", D.t("debt_due_pct_sub"));
+
+      // due customers across the scope, each tagged with its salesperson, top 100 by overdue
+      const rows = [];
+      scoped.forEach(r => (r.customers || []).forEach(c => {
+        if ((c.overdue || 0) > 0) rows.push({ name: c.name, city: c.city, receivable: c.receivable, overdue: c.overdue, salesperson: r.salesperson });
+      }));
+      rows.sort((a, b) => b.overdue - a.overdue);
+      const top = rows.slice(0, 100);
+
+      document.getElementById("debtTotals").innerHTML =
+        `${D.t("debt_customers_no")}: <b>${D.fmtNum(rows.length)}</b> · ${D.t("debt_due_all")}: <b style="color:var(--red)">${D.fmtMoney(totalDue)}</b>`;
+      box.innerHTML = `
+        <table class="dt">
+          <thead><tr><th>${D.t("col_customer")}</th><th>${D.t("col_rep")}</th><th>${D.t("col_city")}</th><th>${D.t("col_debit")}</th><th>${D.t("col_overdue")}</th></tr></thead>
+          <tbody>
+          ${top.map(c => `<tr>
+            <td class="strong">${c.name}</td>
+            <td class="muted">${c.salesperson}</td>
+            <td class="muted">${c.city || "—"}</td>
+            <td class="amt">${D.fmtMoney(c.receivable)}</td>
+            <td class="amt"><span class="danger">${D.fmtMoney(c.overdue)}</span></td>
+          </tr>`).join("")}
+          </tbody>
+        </table>`;
+    }
+
+    async function loadDebt() {
+      try { debt = await D.api("rep_debt"); }
+      catch (e) { document.getElementById("debtBox").innerHTML = `<div class="empty">${D.t("no_data")}</div>`; return; }
+      const reps = debt.reps || [];
+      const sel = document.getElementById("debtRep");
+      if (!reps.length) { sel.innerHTML = ""; document.getElementById("debtBox").innerHTML = `<div class="empty">${D.t("no_data")}</div>`; return; }
+      if (debtRep !== DEBT_ALL && !reps.some(r => repKey(r) === debtRep)) debtRep = DEBT_ALL;
+      const sorted = [...reps].sort((a, b) => (b.receivable_total || 0) - (a.receivable_total || 0));
+      sel.innerHTML =
+        `<option value="${DEBT_ALL}"${debtRep === DEBT_ALL ? " selected" : ""}>${D.t("f_rep_all")}</option>` +
+        sorted.map(r => `<option value="${repKey(r)}"${repKey(r) === debtRep ? " selected" : ""}>${r.salesperson} — ${D.fmtMoney(r.receivable_total)}</option>`).join("");
+      renderDebt();
+    }
+
+    async function tick() {
+      loadDebt();
+      let snap;
+      try { snap = await D.api("rep_collections"); }
+      catch (e) {
+        document.getElementById("leaderBox").innerHTML = `<div class="empty">${D.t("no_data")}</div>`;
+        document.getElementById("gridBox").innerHTML = `<div class="empty">${D.t("no_data")}</div>`;
+        document.getElementById("kpis").innerHTML = `<div class="err">${D.t("error_load")}</div>`;
+        return;
+      }
+      D.setUpdated(snap.generated_at);
+      const today = (snap.totals_by_day || {})[snap.today] || { paid: 0, pending: 0, total: 0 };
+      document.getElementById("kpis").innerHTML =
+        kpi("k-vio", D.t("coll_today"), D.fmtMoney(today.total), "&nbsp;") +
+        kpi("k-grn", D.t("coll_today_paid"), D.fmtMoney(today.paid), "&nbsp;") +
+        kpi("k-amb", D.t("coll_today_pending"), D.fmtMoney(today.pending), "&nbsp;") +
+        kpi("", D.t("coll_grand_total"), D.fmtMoney(snap.grand_total), D.isAR() ? "آخر ١٤ يوم" : "last 14 days");
+      renderLeader(snap);
+      renderGrid(snap);
+    }
+    tick();
+    setInterval(tick, D.cfg.POLL_MS);
+  })();
+  </script>
+</body>
+</html>
