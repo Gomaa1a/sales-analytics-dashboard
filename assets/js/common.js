@@ -32,6 +32,11 @@
       kpi_pending: "تنبيهات تحتاج مراجعة",
       kpi_value: "القيمة",
       orders: "طلب",
+      status_title: "حالة طلبات اليوم",
+      st_confirmed: "مؤكدة",
+      st_drafts: "عروض أسعار",
+      st_cancelled: "ملغاة",
+      st_total: "الإجمالي",
       latest_alerts: "أحدث التنبيهات",
       view_all: "عرض الكل",
       no_alerts: "لا توجد تنبيهات حالياً ✅",
@@ -187,6 +192,11 @@
       kpi_pending: "Alerts to review",
       kpi_value: "Value",
       orders: "orders",
+      status_title: "Today's orders by status",
+      st_confirmed: "Confirmed",
+      st_drafts: "Quotations",
+      st_cancelled: "Cancelled",
+      st_total: "Total",
       latest_alerts: "Latest alerts",
       view_all: "View all",
       no_alerts: "No alerts right now ✅",
@@ -383,6 +393,30 @@
 
     if (endpointKey === "summary" || endpointKey === "regions" || endpointKey === "salespeople" || endpointKey === "trends" || endpointKey === "collections" || endpointKey === "reps" || endpointKey === "rep_collections" || endpointKey === "rep_debt") {
       return snapshot(endpointKey);
+    }
+
+    if (endpointKey === "today_status") {
+      // Live status breakdown of TODAY's orders, straight from dashboard_orders.
+      // "Today" uses the same Asia/Baghdad day boundary the n8n summary uses, so the
+      // "confirmed" count here matches the "Confirmed today" KPI exactly.
+      const bag = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Baghdad" }));
+      const pad = n => String(n).padStart(2, "0");
+      const dstr = d => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+      const today = dstr(bag);
+      const tmr = new Date(bag); tmr.setDate(bag.getDate() + 1);
+      const rows = await sbGet(
+        `${CFG.TABLES.orders}?select=state&create_date=gte.${today}&create_date=lt.${dstr(tmr)}&limit=5000`);
+      const c = { sale: 0, done: 0, draft: 0, sent: 0, cancel: 0 };
+      (rows || []).forEach(r => { if (c[r.state] != null) c[r.state]++; });
+      const confirmed = c.sale + c.done;
+      const drafts = c.draft + c.sent;
+      const cancelled = c.cancel;
+      return {
+        generated_at: new Date().toISOString(),
+        confirmed, drafts, cancelled,
+        total: confirmed + drafts + cancelled,
+        by_state: c
+      };
     }
 
     if (endpointKey === "acks") {

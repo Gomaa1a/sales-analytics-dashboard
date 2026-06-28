@@ -12,6 +12,11 @@
   <main class="wrap">
     <div id="kpis" class="kpi-grid"></div>
 
+    <div class="panel">
+      <div class="panel-head"><h2 id="statusTitle"></h2></div>
+      <div class="panel-body"><div id="statusBox" class="cstats"></div></div>
+    </div>
+
     <div class="grid-2">
       <div class="panel">
         <div class="panel-head"><h2 id="dayTitle"></h2></div>
@@ -65,6 +70,7 @@
   (function () {
     const D = window.DASH;
     D.buildChrome("overview");
+    document.getElementById("statusTitle").textContent = D.t("status_title");
     document.getElementById("dayTitle").textContent = D.t("daily_week");
     document.getElementById("latestTitle").textContent = D.t("latest_alerts");
     document.getElementById("areaTitle").textContent = D.t("top_areas_title");
@@ -95,6 +101,17 @@
       } catch (e) {
         document.getElementById("kpis").innerHTML = `<div class="err">${D.t("error_load")}</div>`;
       }
+    }
+
+    async function loadTodayStatus() {
+      const box = document.getElementById("statusBox");
+      let st;
+      try { st = await D.api("today_status"); } catch (e) { return; }
+      box.innerHTML =
+        cstat(D.t("st_confirmed"), D.fmtNum(st.confirmed), "", "grn") +
+        cstat(D.t("st_drafts"), D.fmtNum(st.drafts), "", st.drafts ? "amb" : "") +
+        cstat(D.t("st_cancelled"), D.fmtNum(st.cancelled), "", st.cancelled ? "red" : "") +
+        cstat(D.t("st_total"), D.fmtNum(st.total), "", "");
     }
 
     async function loadTrends() {
@@ -257,7 +274,7 @@
       </div>`).join("");
     }
 
-    async function tick() { await loadSummary(); await loadTrends(); await loadCollections(); await loadReps(); await loadAlerts(); }
+    async function tick() { await loadSummary(); await loadTodayStatus(); await loadTrends(); await loadCollections(); await loadReps(); await loadAlerts(); }
     tick();
     setInterval(tick, D.cfg.POLL_MS);
   })();
