@@ -81,7 +81,7 @@ header.app {
 .page-head p { font-size: 13px; color: var(--ink3); margin-top: 2px; }
 
 /* ---------- KPI cards ---------- */
-.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; margin-bottom: 22px; }
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; margin-bottom: 16px; }
 .kpi {
   background: var(--surface); border: 1px solid var(--bdr); border-radius: 14px;
   padding: 16px 18px; box-shadow: var(--shadow); position: relative; overflow: hidden;
@@ -95,13 +95,25 @@ header.app {
 .kpi-sub b { color: var(--ink); }
 
 /* ---------- cards / panels ---------- */
-.panel { background: var(--surface); border: 1px solid var(--bdr); border-radius: 14px; box-shadow: var(--shadow); margin-bottom: 18px; overflow: hidden; }
+.panel { background: var(--surface); border: 1px solid var(--bdr); border-radius: 14px; box-shadow: var(--shadow); margin-bottom: 14px; overflow: hidden; }
 .panel-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--bdr); }
 .panel-head h2 { font-size: 15px; font-weight: 700; }
 .panel-head a { font-size: 12.5px; color: var(--acc); text-decoration: none; font-weight: 600; }
 .panel-body { padding: 16px 18px; }
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
 @media (max-width: 920px) { .grid-2 { grid-template-columns: 1fr; } }
+
+/* ---------- compact data regions ----------
+   Long tables/lists scroll inside their panel (with a sticky header) instead of
+   stretching the whole page. Print overrides below expand them so PDF shows all rows. */
+.cap { max-height: 60vh; overflow-y: auto; }
+.cap table.dt thead th { position: sticky; top: 0; z-index: 2; background: var(--surface); }
+@media (max-width: 640px) { .cap { max-height: 72vh; } }
+
+/* Alert Center: alert table beside the notes feed (notes in a slim side column) */
+.split-notes { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
+.split-notes > .panel { margin-bottom: 0; }
+@media (max-width: 1000px) { .split-notes { grid-template-columns: 1fr; } }
 
 /* ---------- tables ---------- */
 table.dt { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -213,8 +225,8 @@ table.dt tbody tr:hover { background: var(--surface2); }
 .coll-grid tfoot td { font-weight: 700; border-top: 2px solid var(--bdr); }
 
 /* ---------- chart wrap ---------- */
-.chart-box { position: relative; height: 300px; }
-.chart-box.tall { height: 360px; }
+.chart-box { position: relative; height: 260px; }
+.chart-box.tall { height: 310px; }
 
 /* ---------- YoY rep cards ---------- */
 .rep-card { border: 1px solid var(--bdr); border-radius: 14px; padding: 16px; background: var(--surface); box-shadow: var(--shadow); }
@@ -371,6 +383,10 @@ table.dt tbody tr:hover { background: var(--surface2); }
   .kpi, .panel, .rep-card { box-shadow: none; break-inside: avoid; }
   .panel { margin-bottom: 12px; }
   .panel-body { overflow: visible; }
+  /* expand capped tables/lists and the alert split so the PDF shows everything */
+  .cap { max-height: none !important; overflow: visible !important; }
+  .cap table.dt thead th { position: static; }
+  .split-notes { display: block; }
   .chart-box { height: 250px; }
   .chart-box.tall { height: 300px; }
   table.dt { font-size: 11px; }
