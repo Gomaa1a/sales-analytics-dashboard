@@ -33,5 +33,14 @@ window.DASH_CONFIG = {
   SOUND_ENABLED: true,
 
   // Treat "warning" alerts as sound-worthy too (false = critical only).
-  SOUND_ON_WARNING: false
+  SOUND_ON_WARNING: false,
+
+  // ---- Executive targets (used by the Overview / Executive summary band) ----
+  // Set these to the company's real goals. They drive the "vs target",
+  // attainment %, and pace-to-target figures. Pure presentation config — no
+  // sensitive data. Set MONTHLY_REVENUE_TARGET to 0 to hide the target bar.
+  TARGETS: {
+    MONTHLY_REVENUE_TARGET: 900000000,  // IQD confirmed-sales goal for the month (PLACEHOLDER — set the real figure)
+    COLLECTION_RATE_TARGET: 70        // target for collected ÷ sales (%)
+  }
 };

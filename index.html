@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Sales Command Center</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=19" />
+  <link rel="stylesheet" href="assets/css/style.css?v=20" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>" />
 </head>
 <body>
@@ -17,7 +17,22 @@
 
     <div class="filters" id="fbHost"></div>
 
-    <div id="kpis" class="kpi-grid"></div>
+    <!-- Executive summary band (merged into the overview) -->
+    <section class="exec">
+      <div class="exec-heads" id="execHeads"></div>
+      <div class="exec-mini" id="execMini"></div>
+      <div class="exec-foot">
+        <div class="exec-story">
+          <div class="ex-l" id="storyLbl"></div>
+          <p id="storyText"></p>
+        </div>
+        <div class="exec-var">
+          <div class="ex-l" id="varLbl"></div>
+          <div class="exec-n" id="varNum">—</div>
+          <div class="ex-sub" id="varSub"></div>
+        </div>
+      </div>
+    </section>
 
     <div class="grid-2">
       <div class="panel">
@@ -45,8 +60,8 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=19"></script>
-  <script src="assets/js/common.js?v=19"></script>
+  <script src="assets/js/config.js?v=20"></script>
+  <script src="assets/js/common.js?v=20"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -57,69 +72,178 @@
     document.getElementById("statusTitle").textContent = D.t("ov_status_mix");
     document.getElementById("custTitle").textContent = D.t("top_customers");
     document.getElementById("govTitle").textContent = D.t("ov_top_govs");
+    document.getElementById("storyLbl").textContent = D.t("ex_story");
+    document.getElementById("varLbl").textContent = D.t("ex_var");
 
     const isConf = o => o.state === "sale" || o.state === "done";
     const isQuote = o => o.state === "draft" || o.state === "sent";
     const val = o => Number(o.amount_total) || 0;
+    const num = n => Number(n) || 0;
     const dayOf = o => String(o.create_date || o.date_order || "").slice(0, 10);
-
-    const kpi = (cls, label, num, sub) =>
-      `<div class="kpi ${cls}"><div class="kpi-l">${label}</div><div class="kpi-n">${num}</div><div class="kpi-sub">${sub || "&nbsp;"}</div></div>`;
+    const inMonth = (o, ym) => dayOf(o).slice(0, 7) === ym;
+    const TARGETS = (D.cfg.TARGETS || {});
+    const TARGET = num(TARGETS.MONTHLY_REVENUE_TARGET);
 
     let dayChart = null, statusChart = null, custChart = null, govChart = null;
-    let allRows = [];           // orders loaded for the active date window
+    let allRows = [], payments = [], debtRows = [], alerts = [];
     let loadedFrom = null, loadedTo = null;
 
-    // Baghdad "today" + month start as sensible defaults
+    // Baghdad calendar anchors
     const bag = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Baghdad" }));
     const pad = n => String(n).padStart(2, "0");
     const ymd = d => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
     const today = ymd(bag);
-    const monthStart = ymd(new Date(bag.getFullYear(), bag.getMonth(), 1));
+    const thisMonth = today.slice(0, 7);
+    const monthStart = thisMonth + "-01";
+    const lastMonth = ymd(new Date(bag.getFullYear(), bag.getMonth() - 1, 1)).slice(0, 7);
+    const lastMonthStart = lastMonth + "-01";
+    const daysInMonth = new Date(bag.getFullYear(), bag.getMonth() + 1, 0).getDate();
+    const dayOfMonth = bag.getDate();
 
     const fb = D.filterBar(document.getElementById("fbHost"), { date: true, rep: true, customer: true }, onFilterChange);
-    // seed the date range = current month → today
     document.getElementById("fbFrom").value = monthStart;
     document.getElementById("fbTo").value = today;
 
     async function onFilterChange() {
       const v = fb.values();
       const from = v.from || monthStart, to = v.to || today;
-      if (from !== loadedFrom || to !== loadedTo) { await loadWindow(from, to); }
+      // window must cover the chosen range AND last-month..today (for MoM + the month-anchored band)
+      const wFrom = [from, lastMonthStart].sort()[0];
+      const wTo = to > today ? to : today;
+      if (wFrom !== loadedFrom || wTo !== loadedTo) await loadWindow(wFrom, wTo);
       render();
     }
 
     async function loadWindow(from, to) {
       try {
-        allRows = await D.loadOrders({ from, to, dateField: "create_date",
-          select: "order_id,order_name,partner_name,salesperson,user_id,city,state,amount_total,create_date,date_order" });
+        [allRows, payments] = await Promise.all([
+          D.loadOrders({ from, to, dateField: "create_date",
+            select: "order_id,order_name,partner_name,salesperson,user_id,city,state,amount_total,create_date,date_order" }),
+          D.loadPayments({ from, to })
+        ]);
         loadedFrom = from; loadedTo = to;
+        fb.setReps(allRows.map(o => o.salesperson));
         D.setUpdated(new Date().toISOString());
-      } catch (e) { allRows = []; document.getElementById("kpis").innerHTML = `<div class="err">${D.t("error_load")}</div>`; }
+      } catch (e) { allRows = []; payments = []; document.getElementById("execHeads").innerHTML = `<div class="err">${D.t("error_load")}</div>`; }
     }
 
+    async function loadSnapshots() {
+      // live overdue (rep_debt) + value-at-risk (alerts) — not date-windowed
+      try {
+        const snap = await D.api("rep_debt");
+        debtRows = [];
+        (snap.reps || []).forEach(r => (r.customers || []).forEach(c =>
+          debtRows.push({ name: c.name, receivable: num(c.receivable), overdue: num(c.overdue), salesperson: r.salesperson })));
+      } catch (e) { debtRows = []; }
+      try { const a = await D.api("alerts"); alerts = a.alerts || []; } catch (e) { alerts = []; }
+    }
+
+    const card = (lbl, n, extra) =>
+      `<div class="exec-card"><div class="ex-l">${lbl}</div><div class="exec-row"><div class="exec-n">${n}</div>${extra || ""}</div>`;
+    const mini = (lbl, v, d) =>
+      `<div class="ex-mini"><div class="ex-l">${lbl}</div><div class="ex-v">${v}</div><div class="ex-d">${d || "&nbsp;"}</div></div>`;
+    const deltaTag = pct => `<span class="exec-delta ${pct >= 0 ? "up" : "down"}">${pct >= 0 ? "▲" : "▼"} ${Math.abs(pct)}%</span>`;
+    const pctOf = (a, b) => b > 0 ? Math.round((a - b) / b * 100) : (a > 0 ? 100 : 0);
+
     function render() {
-      // rep + customer narrowing happens client-side on the loaded window
-      const rows = allRows.filter(o => fb.match(o, { rep: "salesperson", cust: "partner_name" }));
-      fb.setCount(rows.length);
+      const v = fb.values();
+      const from = v.from || monthStart, to = v.to || today;
+      // rep + customer narrowing applies to everything ("search changes all data")
+      const matchRC = o => fb.match(o, { rep: "salesperson", cust: "partner_name" });
 
-      const conf = rows.filter(isConf), quotes = rows.filter(isQuote);
-      const confVal = conf.reduce((s, o) => s + val(o), 0);
-      const quoteVal = quotes.reduce((s, o) => s + val(o), 0);
-      const aov = conf.length ? Math.round(confVal / conf.length) : 0;
-      const convPct = (conf.length + quotes.length) ? Math.round(conf.length / (conf.length + quotes.length) * 100) : 0;
-      const customers = new Set(conf.map(o => o.partner_name).filter(Boolean)).size;
+      // ----- filter-range slice (drives the secondary stats + charts) -----
+      const rangeRows = allRows.filter(o => { const d = dayOf(o); return d >= from && d <= to && matchRC(o); });
+      const rConf = rangeRows.filter(isConf), rQuotes = rangeRows.filter(isQuote);
+      const rConfVal = rConf.reduce((s, o) => s + val(o), 0);
+      const aov = rConf.length ? Math.round(rConfVal / rConf.length) : 0;
+      const convPct = (rConf.length + rQuotes.length) ? Math.round(rConf.length / (rConf.length + rQuotes.length) * 100) : 0;
+      const customers = new Set(rConf.map(o => o.partner_name).filter(Boolean)).size;
+      fb.setCount(rangeRows.length);
 
-      document.getElementById("kpis").innerHTML =
-        kpi("k-grn", D.t("ov_confirmed"), D.fmtNum(conf.length), `${D.t("kpi_value")}: <b>${D.fmtMoney(confVal)}</b>`) +
-        kpi("", D.t("kpi_quotes"), D.fmtNum(quotes.length), `${D.t("conversion")}: <b>${convPct}%</b> · ${D.fmtMoney(quoteVal)}`) +
-        kpi("k-vio", D.t("kpi_avg"), D.fmtMoney(aov), "&nbsp;") +
-        kpi("", D.t("ov_customers"), D.fmtNum(customers), "&nbsp;");
+      // ----- month-anchored slice (drives the hero band) -----
+      const confAll = allRows.filter(o => isConf(o) && matchRC(o));
+      const revMonth = confAll.filter(o => inMonth(o, thisMonth)).reduce((s, o) => s + val(o), 0);
+      const revLast = confAll.filter(o => inMonth(o, lastMonth)).reduce((s, o) => s + val(o), 0);
+      const momRev = pctOf(revMonth, revLast);
+      const attain = TARGET > 0 ? Math.round(revMonth / TARGET * 100) : null;
+      const pace = dayOfMonth > 0 ? Math.round(revMonth / dayOfMonth * daysInMonth) : revMonth;
+      const paceVs = TARGET > 0 ? Math.round(pace / TARGET * 100) : null;
 
-      drawByDay(conf);
-      drawStatus(rows);
-      drawTopCustomers(conf);
-      drawTopGovs(conf);
+      const paysRC = payments.filter(p => fb.match(p, { rep: "salesperson", cust: "partner_name" }));
+      const cashMonth = paysRC.filter(p => String(p.date).slice(0, 7) === thisMonth).reduce((s, p) => s + num(p.amount), 0);
+      const vsSales = revMonth > 0 ? Math.round(cashMonth / revMonth * 100) : null;
+
+      // overdue / receivable (respect rep + customer filter)
+      const debtRC = debtRows.filter(r => (!v.rep || r.salesperson === v.rep) && (!v.cust || String(r.name || "").toLowerCase().includes(v.cust)));
+      const receivable = debtRC.reduce((s, r) => s + r.receivable, 0);
+      const overdue = debtRC.reduce((s, r) => s + r.overdue, 0);
+      const top10 = [...debtRC].sort((a, b) => b.overdue - a.overdue).slice(0, 10).reduce((s, r) => s + r.overdue, 0);
+      const conc = overdue > 0 ? Math.round(top10 / overdue * 100) : 0;
+      const dso = (receivable > 0 && revMonth > 0) ? Math.round(receivable / revMonth * 30) : null;
+
+      // ----- hero cards -----
+      const barCls = paceVs == null ? "" : (paceVs >= 100 ? "" : (paceVs >= 80 ? "warn" : "bad"));
+      const targetBlock = TARGET > 0
+        ? `<div class="ex-bar ${barCls}"><i style="width:${Math.min(attain, 100)}%"></i></div>
+           <div class="ex-sub"><b>${attain}%</b> ${D.t("ex_of_target")} (${D.fmtMoney(TARGET)}) · ${D.t("ex_pace")} <b>${D.fmtMoney(pace)}</b> (${paceVs}%)</div>`
+        : `<div class="ex-sub" style="margin-top:8px">${D.fmtNum(confAll.filter(o => inMonth(o, thisMonth)).length)} ${D.t("orders")}</div>`;
+
+      document.getElementById("execHeads").innerHTML =
+        card(D.t("ex_revenue"), D.fmtMoney(revMonth), revLast > 0 ? deltaTag(momRev) : "") + targetBlock + `</div>` +
+        card(D.t("ex_cash"), D.fmtMoney(cashMonth), "") +
+          `<div class="ex-sub" style="margin-top:9px">${D.t("coll_vs_sales")}: <b>${vsSales != null ? vsSales + "%" : "—"}</b>` +
+          `${dso != null ? ` · ${D.t("ex_dso")}: <b>${dso}</b>` : ""}</div></div>` +
+        `<div class="exec-card"><div class="ex-l">${D.t("ex_overdue")}</div><div class="exec-row"><div class="exec-n" style="color:var(--red)">${D.fmtMoney(overdue)}</div></div>` +
+          `<div class="ex-sub" style="margin-top:9px">${D.t("ex_conc_sub")}: <b>${conc}%</b></div></div>`;
+
+      // ----- secondary mini stats (filter-range) -----
+      const repAgg = {}; rConf.forEach(o => { const n = o.salesperson || "—"; repAgg[n] = (repAgg[n] || 0) + val(o); });
+      const topRep = Object.entries(repAgg).sort((a, b) => b[1] - a[1])[0];
+      const govAgg = {}; let govTotal = 0; rConf.forEach(o => { const g = D.govLabel(D.govOf(o.city).key); govAgg[g] = (govAgg[g] || 0) + val(o); govTotal += val(o); });
+      const topGov = Object.entries(govAgg).sort((a, b) => b[1] - a[1])[0];
+      const govShare = (topGov && govTotal > 0) ? Math.round(topGov[1] / govTotal * 100) : 0;
+
+      document.getElementById("execMini").innerHTML =
+        mini(D.t("conversion"), convPct + "%", `${D.fmtNum(rConf.length)} ${D.t("ov_confirmed")} · ${D.fmtNum(rQuotes.length)} ${D.t("kpi_quotes")}`) +
+        mini(D.t("kpi_avg"), D.fmtMoney(aov), `${D.fmtNum(customers)} ${D.t("ov_customers")}`) +
+        mini(D.t("ex_top_rep"), topRep ? topRep[0] : "—", topRep ? D.fmtMoney(topRep[1]) : "&nbsp;") +
+        mini(D.t("ex_top_gov"), topGov ? topGov[0] : "—", topGov ? `${govShare}% ${D.t("share")}` : "&nbsp;");
+
+      // ----- value at risk (critical alerts) -----
+      const crit = alerts.filter(a => a.level === "critical");
+      const var$ = crit.reduce((s, a) => s + num(a.amount_total), 0);
+      document.getElementById("varNum").textContent = D.fmtMoney(var$);
+      document.getElementById("varSub").innerHTML = `${D.fmtNum(crit.length)} ${D.t("ex_var_sub")}`;
+
+      // ----- narrative -----
+      document.getElementById("storyText").innerHTML = buildStory({ revMonth, momRev, hasLast: revLast > 0, attain, pace, vsSales, overdue, conc, topGov, govShare });
+
+      // ----- charts (filter-range) -----
+      drawByDay(rConf);
+      drawStatus(rangeRows);
+      drawTopCustomers(rConf);
+      drawTopGovs(rConf);
+    }
+
+    function buildStory(x) {
+      const m = D.fmtMoney;
+      const dir = p => p >= 0 ? "▲" : "▼";
+      if (D.isAR()) {
+        let s = `المبيعات المؤكدة هذا الشهر <b>${m(x.revMonth)}</b>`;
+        if (x.hasLast) s += ` (${dir(x.momRev)} ${Math.abs(x.momRev)}% عن الشهر الماضي)`;
+        if (x.attain != null) s += `، أي <b>${x.attain}%</b> من الهدف، والمتوقّع <b>${m(x.pace)}</b> بنهاية الشهر`;
+        if (x.vsSales != null) s += `. التحصيل <b>${x.vsSales}%</b> من المبيعات`;
+        if (x.overdue > 0) s += `، والمتأخرات <b>${m(x.overdue)}</b> يتركّز <b>${x.conc}%</b> منها في أكبر ١٠ عملاء`;
+        if (x.topGov) s += `. أعلى محافظة: <b>${x.topGov[0]}</b> (${x.govShare}%)`;
+        return s + ".";
+      }
+      let s = `Confirmed sales this month are <b>${m(x.revMonth)}</b>`;
+      if (x.hasLast) s += ` (${dir(x.momRev)} ${Math.abs(x.momRev)}% vs last month)`;
+      if (x.attain != null) s += `, i.e. <b>${x.attain}%</b> of target, on pace for <b>${m(x.pace)}</b> by month-end`;
+      if (x.vsSales != null) s += `. Cash collected is <b>${x.vsSales}%</b> of sales`;
+      if (x.overdue > 0) s += `, and overdue of <b>${m(x.overdue)}</b> is <b>${x.conc}%</b> concentrated in the top 10 customers`;
+      if (x.topGov) s += `. Top governorate: <b>${x.topGov[0]}</b> (${x.govShare}%)`;
+      return s + ".";
     }
 
     function drawByDay(conf) {
@@ -193,9 +317,14 @@
       });
     }
 
-    // initial load + periodic refresh of the current window
-    (async function init() { await loadWindow(monthStart, today); render(); })();
-    setInterval(async () => { await loadWindow(loadedFrom || monthStart, loadedTo || today); render(); }, D.cfg.POLL_MS);
+    (async function init() {
+      await Promise.all([loadWindow(lastMonthStart, today), loadSnapshots()]);
+      render();
+    })();
+    setInterval(async () => {
+      await Promise.all([loadWindow(loadedFrom || lastMonthStart, loadedTo || today), loadSnapshots()]);
+      render();
+    }, D.cfg.POLL_MS);
   })();
   </script>
 </body>

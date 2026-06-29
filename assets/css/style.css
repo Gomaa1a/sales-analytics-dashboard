@@ -94,6 +94,41 @@ header.app {
 .kpi-sub { font-size: 12px; color: var(--ink2); margin-top: 4px; }
 .kpi-sub b { color: var(--ink); }
 
+/* ---------- executive summary band (merged into the overview) ---------- */
+.exec { margin-bottom: 18px; }
+.exec-heads { display: grid; grid-template-columns: 1.5fr 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+.exec-card { background: var(--surface); border: 1px solid var(--bdr); border-radius: 14px; padding: 16px 18px; box-shadow: var(--shadow); position: relative; overflow: hidden; }
+.exec-card .ex-l { font-size: 12px; color: var(--ink3); font-weight: 500; }
+.exec-row { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+.exec-n { font-size: 28px; font-weight: 700; line-height: 1.1; }
+.exec-delta { font-size: 12.5px; font-weight: 700; }
+.up { color: var(--grn); } .down { color: var(--red); }
+.ex-bar { height: 8px; background: var(--surface2); border-radius: 6px; overflow: hidden; margin: 11px 0 6px; }
+.ex-bar > i { display: block; height: 100%; background: var(--grn); border-radius: 6px; }
+.ex-bar.warn > i { background: var(--amb); } .ex-bar.bad > i { background: var(--red); }
+.ex-sub { font-size: 11.5px; color: var(--ink2); }
+.ex-sub b { color: var(--ink); }
+
+.exec-mini { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 14px; }
+.ex-mini { background: var(--surface); border: 1px solid var(--bdr); border-radius: 12px; padding: 12px 14px; box-shadow: var(--shadow); }
+.ex-mini .ex-l { font-size: 11.5px; color: var(--ink3); }
+.ex-mini .ex-v { font-size: 18px; font-weight: 700; margin-top: 3px; line-height: 1.2; }
+.ex-mini .ex-d { font-size: 11px; margin-top: 2px; }
+
+.exec-foot { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+.exec-story { background: linear-gradient(110deg, var(--bg), var(--bg2)); color: #fff; border-radius: 14px; padding: 14px 16px; }
+.exec-story .ex-l { color: #9fb0d0; margin-bottom: 5px; }
+.exec-story p { font-size: 13.5px; line-height: 1.6; }
+.exec-var { background: var(--red-bg); border: 1px solid var(--red-bdr); border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; justify-content: center; }
+.exec-var .ex-l { color: #991b1b; }
+.exec-var .exec-n { color: var(--red); margin-top: 4px; }
+.exec-var .ex-sub { color: #7f1d1d; }
+@media (max-width: 920px) {
+  .exec-heads { grid-template-columns: 1fr; }
+  .exec-mini { grid-template-columns: 1fr 1fr; }
+  .exec-foot { grid-template-columns: 1fr; }
+}
+
 /* ---------- cards / panels ---------- */
 .panel { background: var(--surface); border: 1px solid var(--bdr); border-radius: 14px; box-shadow: var(--shadow); margin-bottom: 14px; overflow: hidden; }
 .panel-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--bdr); }
