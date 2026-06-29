@@ -4,18 +4,20 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Sales Command Center</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=14" />
+  <link rel="stylesheet" href="assets/css/style.css?v=18" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>" />
 </head>
 <body>
   <header id="appHeader" class="app"></header>
   <main class="wrap">
-    <div id="kpis" class="kpi-grid"></div>
-
-    <div class="panel">
-      <div class="panel-head"><h2 id="statusTitle"></h2></div>
-      <div class="panel-body"><div id="statusBox" class="cstats"></div></div>
+    <div class="page-head">
+      <h1 id="pgTitle"></h1>
+      <p id="pgSub"></p>
     </div>
+
+    <div class="filters" id="fbHost"></div>
+
+    <div id="kpis" class="kpi-grid"></div>
 
     <div class="grid-2">
       <div class="panel">
@@ -23,260 +25,177 @@
         <div class="panel-body"><div class="chart-box"><canvas id="dayChart"></canvas></div></div>
       </div>
       <div class="panel">
-        <div class="panel-head"><h2 id="latestTitle"></h2></div>
-        <div class="panel-body" style="padding:0"><div id="latestAlerts"></div></div>
+        <div class="panel-head"><h2 id="statusTitle"></h2></div>
+        <div class="panel-body"><div class="chart-box"><canvas id="statusChart"></canvas></div></div>
       </div>
-    </div>
-
-    <div class="panel">
-      <div class="panel-head"><h2 id="areaTitle"></h2></div>
-      <div class="panel-body"><div id="areaBox"></div></div>
     </div>
 
     <div class="grid-2">
       <div class="panel">
-        <div class="panel-head"><h2 id="funnelTitle"></h2></div>
-        <div class="panel-body"><div class="chart-box"><canvas id="funnelChart"></canvas></div></div>
+        <div class="panel-head"><h2 id="custTitle"></h2></div>
+        <div class="panel-body"><div class="chart-box"><canvas id="custChart"></canvas></div></div>
       </div>
       <div class="panel">
-        <div class="panel-head"><h2 id="riskTitle"></h2></div>
-        <div class="panel-body"><div class="chart-box"><canvas id="riskChart"></canvas></div></div>
+        <div class="panel-head"><h2 id="govTitle"></h2></div>
+        <div class="panel-body"><div class="chart-box"><canvas id="govChart"></canvas></div></div>
       </div>
-    </div>
-
-    <div class="panel">
-      <div class="panel-head"><h2 id="custTitle"></h2></div>
-      <div class="panel-body"><div class="chart-box"><canvas id="custChart"></canvas></div></div>
-    </div>
-
-    <div class="panel">
-      <div class="panel-head"><h2 id="collTitle"></h2></div>
-      <div class="panel-body"><div id="collectionsBox"></div></div>
-    </div>
-
-    <div class="panel">
-      <div class="panel-head"><h2 id="repTitle"></h2></div>
-      <div class="panel-body"><div id="repBox"></div></div>
     </div>
 
     <div class="foot">Dabboos Sales Command Center · Odoo → n8n → Supabase</div>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=14"></script>
-  <script src="assets/js/common.js?v=14"></script>
-  <script src="assets/js/order-modal.js?v=14"></script>
+  <script src="assets/js/config.js?v=18"></script>
+  <script src="assets/js/common.js?v=18"></script>
   <script>
   (function () {
     const D = window.DASH;
     D.buildChrome("overview");
-    document.getElementById("statusTitle").textContent = D.t("status_title");
-    document.getElementById("dayTitle").textContent = D.t("daily_week");
-    document.getElementById("latestTitle").textContent = D.t("latest_alerts");
-    document.getElementById("areaTitle").textContent = D.t("top_areas_title");
-    document.getElementById("funnelTitle").textContent = D.t("funnel_title");
+    document.getElementById("pgTitle").textContent = D.t("brand");
+    document.getElementById("pgSub").textContent = D.t("ov_sub");
+    document.getElementById("dayTitle").textContent = D.t("ov_orders_day");
+    document.getElementById("statusTitle").textContent = D.t("ov_status_mix");
     document.getElementById("custTitle").textContent = D.t("top_customers");
-    document.getElementById("riskTitle").textContent = D.t("risk_mix");
-    document.getElementById("collTitle").textContent = D.t("collections_title");
-    document.getElementById("repTitle").textContent = D.t("rep_leaderboard");
+    document.getElementById("govTitle").textContent = D.t("ov_top_govs");
 
-    let dayChart = null, funnelChart = null, custChart = null, riskChart = null;
-    const seen = new Set(JSON.parse(localStorage.getItem("seen_alerts") || "[]"));
-    let firstLoad = true;
+    const isConf = o => o.state === "sale" || o.state === "done";
+    const isQuote = o => o.state === "draft" || o.state === "sent";
+    const val = o => Number(o.amount_total) || 0;
+    const dayOf = o => String(o.create_date || o.date_order || "").slice(0, 10);
 
     const kpi = (cls, label, num, sub) =>
       `<div class="kpi ${cls}"><div class="kpi-l">${label}</div><div class="kpi-n">${num}</div><div class="kpi-sub">${sub || "&nbsp;"}</div></div>`;
 
-    async function loadSummary() {
+    let dayChart = null, statusChart = null, custChart = null, govChart = null;
+    let allRows = [];           // orders loaded for the active date window
+    let loadedFrom = null, loadedTo = null;
+
+    // Baghdad "today" + month start as sensible defaults
+    const bag = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Baghdad" }));
+    const pad = n => String(n).padStart(2, "0");
+    const ymd = d => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+    const today = ymd(bag);
+    const monthStart = ymd(new Date(bag.getFullYear(), bag.getMonth(), 1));
+
+    const fb = D.filterBar(document.getElementById("fbHost"), { date: true, rep: true, customer: true }, onFilterChange);
+    // seed the date range = current month → today
+    document.getElementById("fbFrom").value = monthStart;
+    document.getElementById("fbTo").value = today;
+
+    async function onFilterChange() {
+      const v = fb.values();
+      const from = v.from || monthStart, to = v.to || today;
+      if (from !== loadedFrom || to !== loadedTo) { await loadWindow(from, to); }
+      render();
+    }
+
+    async function loadWindow(from, to) {
       try {
-        const s = await D.api("summary");
-        D.setUpdated(s.generated_at);
-        const q = s.month_quotations || { orders: 0, value: 0 };
-        document.getElementById("kpis").innerHTML =
-          kpi("", D.t("kpi_today"), D.fmtNum(s.today.orders), `${D.t("kpi_value")}: <b>${D.fmtMoney(s.today.value)}</b>`) +
-          kpi("k-vio", D.t("kpi_week"), D.fmtNum(s.week.orders), `${D.t("kpi_value")}: <b>${D.fmtMoney(s.week.value)}</b>`) +
-          kpi("k-grn", D.t("kpi_month"), D.fmtNum(s.month.orders), `${D.t("kpi_value")}: <b>${D.fmtMoney(s.month.value)}</b>`) +
-          kpi("", D.t("kpi_quotes"), D.fmtNum(q.orders), `${D.t("conversion")}: <b>${s.conversion_pct != null ? s.conversion_pct + "%" : "—"}</b> · ${D.fmtMoney(q.value)}`) +
-          kpi("k-red", D.t("kpi_pending"), D.fmtNum(s.pending_alerts), `<b>${s.critical}</b> ${D.t("critical")} · <b>${s.warning}</b> ${D.t("warning")}`);
-      } catch (e) {
-        document.getElementById("kpis").innerHTML = `<div class="err">${D.t("error_load")}</div>`;
-      }
+        allRows = await D.loadOrders({ from, to, dateField: "create_date",
+          select: "order_id,order_name,partner_name,salesperson,user_id,city,state,amount_total,create_date,date_order" });
+        loadedFrom = from; loadedTo = to;
+        D.setUpdated(new Date().toISOString());
+      } catch (e) { allRows = []; document.getElementById("kpis").innerHTML = `<div class="err">${D.t("error_load")}</div>`; }
     }
 
-    async function loadTodayStatus() {
-      const box = document.getElementById("statusBox");
-      let st;
-      try { st = await D.api("today_status"); } catch (e) { return; }
-      box.innerHTML =
-        cstat(D.t("st_confirmed"), D.fmtNum(st.confirmed), "", "grn") +
-        cstat(D.t("st_drafts"), D.fmtNum(st.drafts), "", st.drafts ? "amb" : "") +
-        cstat(D.t("st_cancelled"), D.fmtNum(st.cancelled), "", st.cancelled ? "red" : "") +
-        cstat(D.t("st_total"), D.fmtNum(st.total), "", "");
+    function render() {
+      // rep + customer narrowing happens client-side on the loaded window
+      const rows = allRows.filter(o => fb.match(o, { rep: "salesperson", cust: "partner_name" }));
+      fb.setCount(rows.length);
+
+      const conf = rows.filter(isConf), quotes = rows.filter(isQuote);
+      const confVal = conf.reduce((s, o) => s + val(o), 0);
+      const quoteVal = quotes.reduce((s, o) => s + val(o), 0);
+      const aov = conf.length ? Math.round(confVal / conf.length) : 0;
+      const convPct = (conf.length + quotes.length) ? Math.round(conf.length / (conf.length + quotes.length) * 100) : 0;
+      const customers = new Set(conf.map(o => o.partner_name).filter(Boolean)).size;
+
+      document.getElementById("kpis").innerHTML =
+        kpi("k-grn", D.t("ov_confirmed"), D.fmtNum(conf.length), `${D.t("kpi_value")}: <b>${D.fmtMoney(confVal)}</b>`) +
+        kpi("", D.t("kpi_quotes"), D.fmtNum(quotes.length), `${D.t("conversion")}: <b>${convPct}%</b> · ${D.fmtMoney(quoteVal)}`) +
+        kpi("k-vio", D.t("kpi_avg"), D.fmtMoney(aov), "&nbsp;") +
+        kpi("", D.t("ov_customers"), D.fmtNum(customers), "&nbsp;");
+
+      drawByDay(conf);
+      drawStatus(rows);
+      drawTopCustomers(conf);
+      drawTopGovs(conf);
     }
 
-    async function loadTrends() {
-      let tr;
-      try { tr = await D.api("trends"); } catch (e) { return; }
-
-      // daily breakdown of the current week (orders per day)
-      const dd = tr.daily_series || [];
-      // highlight "today" = the most recent day that has orders (future days are 0)
-      let todayIdx = -1; dd.forEach((x, i) => { if (x.orders > 0) todayIdx = i; });
-      const dctx = document.getElementById("dayChart");
+    function drawByDay(conf) {
+      const m = {};
+      conf.forEach(o => { const d = dayOf(o); if (!d) return; if (!m[d]) m[d] = { orders: 0, value: 0 }; m[d].orders++; m[d].value += val(o); });
+      const days = Object.keys(m).sort();
+      const ctx = document.getElementById("dayChart");
       if (dayChart) dayChart.destroy();
-      dayChart = new Chart(dctx, {
+      dayChart = new Chart(ctx, {
         type: "bar",
-        data: { labels: dd.map(x => D.isAR() ? x.label_ar : x.label_en), datasets: [{
-          label: D.t("orders_count"), data: dd.map(x => x.orders),
-          backgroundColor: dd.map((_, i) => i === todayIdx ? "#2563eb" : "#93c5fd"), borderRadius: 6, maxBarThickness: 46 }] },
+        data: { labels: days.map(d => d.slice(8, 10) + "/" + d.slice(5, 7)), datasets: [{
+          label: D.t("orders_count"), data: days.map(d => m[d].orders),
+          backgroundColor: "#2563eb", borderRadius: 5, maxBarThickness: 34 }] },
         options: { maintainAspectRatio: false,
           plugins: { legend: { display: false }, tooltip: { callbacks: {
-            label: c => `${D.fmtNum(c.parsed.y)} ${D.t("orders")} · ${D.fmtMoney(dd[c.dataIndex].value)}` } } },
+            label: c => `${D.fmtNum(c.parsed.y)} ${D.t("orders")} · ${D.fmtMoney(m[days[c.dataIndex]].value)}` } } },
           scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
       });
+    }
 
-      // top 5 areas (cities) buying — last 30 days, by confirmed value
-      const ta = tr.top_areas || [];
-      const areaBox = document.getElementById("areaBox");
-      if (areaBox) {
-        if (ta.length) {
-          const amax = Math.max(1, ...ta.map(x => x.value));
-          areaBox.innerHTML = ta.map(x => `<div class="barline"><div class="barline-h"><span>${x.city}</span><span class="muted">${D.fmtMoney(x.value)} · ${D.fmtNum(x.orders)} ${D.t("orders")}</span></div><div class="bar"><div class="bar-f" style="width:${Math.round(x.value / amax * 100)}%;background:#0ea5e9"></div></div></div>`).join("");
-        } else { areaBox.innerHTML = `<div class="empty">${D.t("no_data")}</div>`; }
-      }
-
-      // pipeline funnel: this month, quotation -> confirmed (counts + value tooltip)
-      const fn = (tr.funnel || []).filter(x => x.state !== "cancel");
-      if (fn.length) {
-        const fctx = document.getElementById("funnelChart");
-        if (funnelChart) funnelChart.destroy();
-        const stColor = { draft: "#94a3b8", sent: "#60a5fa", sale: "#2563eb", done: "#16a34a" };
-        funnelChart = new Chart(fctx, {
-          type: "bar",
-          data: { labels: fn.map(x => D.stateLabel(x.state)), datasets: [{
-            label: D.t("orders_count"), data: fn.map(x => x.orders),
-            backgroundColor: fn.map(x => stColor[x.state] || "#94a3b8"), borderRadius: 6, maxBarThickness: 60 }] },
-          options: { maintainAspectRatio: false,
-            plugins: { legend: { display: false }, tooltip: { callbacks: {
-              label: c => `${D.fmtNum(c.parsed.y)} ${D.t("orders")} · ${D.fmtMoney(fn[c.dataIndex].value)}` } } },
-            scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
-        });
-      }
-
-      // top customers by confirmed value (last 30 days)
-      const tc = tr.top_customers || [];
-      if (tc.length) {
-        const cctx = document.getElementById("custChart");
-        if (custChart) custChart.destroy();
-        custChart = new Chart(cctx, {
-          type: "bar",
-          data: { labels: tc.map(x => x.name), datasets: [{
-            label: D.t("kpi_value"), data: tc.map(x => x.value),
-            backgroundColor: "#0ea5e9", borderRadius: 5, maxBarThickness: 22 }] },
-          options: { maintainAspectRatio: false, indexAxis: "y",
-            plugins: { legend: { display: false }, tooltip: { callbacks: {
-              label: c => `${D.fmtMoneyFull(c.parsed.x)} · ${D.fmtNum(tc[c.dataIndex].orders)} ${D.t("orders")}` } } },
-            scales: { x: { beginAtZero: true, ticks: { callback: v => D.fmtMoney(v) } } } }
-        });
-      }
-
-      // risk mix doughnut (last 30 days, all live orders)
-      const rm = tr.risk_mix || { critical: 0, warning: 0, ok: 0 };
-      const rctx = document.getElementById("riskChart");
-      if (riskChart) riskChart.destroy();
-      riskChart = new Chart(rctx, {
+    function drawStatus(rows) {
+      const order = ["draft", "sent", "sale", "done", "cancel"];
+      const color = { draft: "#94a3b8", sent: "#60a5fa", sale: "#16a34a", done: "#0891b2", cancel: "#dc2626" };
+      const counts = {}; order.forEach(s => counts[s] = 0);
+      rows.forEach(o => { if (counts[o.state] != null) counts[o.state]++; });
+      const present = order.filter(s => counts[s] > 0);
+      const ctx = document.getElementById("statusChart");
+      if (statusChart) statusChart.destroy();
+      statusChart = new Chart(ctx, {
         type: "doughnut",
-        data: { labels: [D.t("critical"), D.t("warning"), "OK"], datasets: [{
-          data: [rm.critical, rm.warning, rm.ok],
-          backgroundColor: ["#dc2626", "#f59e0b", "#16a34a"], borderWidth: 2 }] },
-        options: { maintainAspectRatio: false, cutout: "58%",
+        data: { labels: present.map(s => D.stateLabel(s)), datasets: [{
+          data: present.map(s => counts[s]), backgroundColor: present.map(s => color[s]), borderWidth: 2 }] },
+        options: { maintainAspectRatio: false, cutout: "55%",
           plugins: { legend: { position: "bottom" }, tooltip: { callbacks: {
             label: c => `${c.label}: ${D.fmtNum(c.parsed)} ${D.t("orders")}` } } } }
       });
     }
 
-    async function loadAlerts() {
-      try {
-        const a = await D.api("alerts");
-        const top = a.alerts.slice(0, 6);
-        document.getElementById("latestAlerts").innerHTML = top.length ? `
-          <div class="alert-cards">
-          ${top.map(r => {
-            const lvl = r.level === "critical" ? "crit" : "warn";
-            const badge = r.level === "critical" ? D.t("critical") : D.t("warning");
-            const reasons = (r.reasons || [])
-              .map(x => `<li>${D.isAR() ? (x.ar || x.en || "") : (x.en || x.ar || "")}</li>`).join("");
-            return `<div class="alert-card ac-${lvl}">
-              <div class="ac-top">
-                <a class="order-link" data-order-id="${r.order_id}">${r.order_name || ("#" + r.order_id)} · ${r.partner_name || ""}</a>
-                <span class="badge b-${lvl}">${badge}</span>
-              </div>
-              <div class="ac-meta">${D.t("kpi_value")}: <b>${D.fmtMoney(r.amount_total)}</b>${r.salesperson ? ` · ${D.t("rep")}: ${r.salesperson}` : ""}</div>
-              ${reasons ? `<ol class="ac-reasons">${reasons}</ol>` : ""}
-            </div>`;
-          }).join("")}
-          </div>` : `<div class="empty">${D.t("no_alerts")}</div>`;
-
-        const fresh = a.alerts.filter(r => !seen.has(r.order_id) && (r.level === "critical" || (D.cfg.SOUND_ON_WARNING && r.level === "warning")));
-        a.alerts.forEach(r => seen.add(r.order_id));
-        localStorage.setItem("seen_alerts", JSON.stringify([...seen].slice(-500)));
-        if (!firstLoad && fresh.length) {
-          D.beep();
-          const f = fresh[0];
-          D.toast(`<b>🚨 ${D.t("critical")} — ${f.order_name || ("#" + f.order_id)}</b>${f.partner_name} · ${D.fmtMoney(f.amount_total)}`, "critical");
-          D.notify(D.t("alerts_title"), `${f.order_name || f.order_id} · ${f.partner_name}`);
-        }
-        firstLoad = false;
-      } catch (e) { /* keep last */ }
+    function drawTopCustomers(conf) {
+      const m = {};
+      conf.forEach(o => { const n = o.partner_name || "—"; if (!m[n]) m[n] = { orders: 0, value: 0 }; m[n].orders++; m[n].value += val(o); });
+      const top = Object.entries(m).map(([name, x]) => ({ name, ...x })).sort((a, b) => b.value - a.value).slice(0, 8);
+      const ctx = document.getElementById("custChart");
+      if (custChart) custChart.destroy();
+      custChart = new Chart(ctx, {
+        type: "bar",
+        data: { labels: top.map(x => x.name), datasets: [{
+          label: D.t("kpi_value"), data: top.map(x => x.value), backgroundColor: "#0ea5e9", borderRadius: 5, maxBarThickness: 20 }] },
+        options: { maintainAspectRatio: false, indexAxis: "y",
+          plugins: { legend: { display: false }, tooltip: { callbacks: {
+            label: c => `${D.fmtMoneyFull(c.parsed.x)} · ${D.fmtNum(top[c.dataIndex].orders)} ${D.t("orders")}` } } },
+          scales: { x: { beginAtZero: true, ticks: { callback: v => D.fmtMoney(v) } } } }
+      });
     }
 
-    const cstat = (l, n, s, cls) =>
-      `<div class="cstat ${cls || ""}"><div class="cstat-l">${l}</div><div class="cstat-n">${n}</div><div class="cstat-s">${s || "&nbsp;"}</div></div>`;
-    const barline = (label, v, max, color, valText) =>
-      `<div class="barline"><div class="barline-h"><span>${label}</span><span class="muted">${valText != null ? valText : D.fmtNum(v)}</span></div><div class="bar"><div class="bar-f" style="width:${max > 0 ? Math.round(v / max * 100) : 0}%;background:${color}"></div></div></div>`;
-
-    async function loadCollections() {
-      const box = document.getElementById("collectionsBox");
-      let cl;
-      try { cl = await D.api("collections"); } catch (e) { box.innerHTML = `<div class="empty">${D.t("no_data")}</div>`; return; }
-      const dso = cl.dso_buckets || { le30: 0, b31_60: 0, gt60: 0 };
-      const dmax = Math.max(1, dso.le30, dso.b31_60, dso.gt60);
-      const ov = (cl.overdue_customers || []).slice(0, 5);
-      const ovmax = Math.max(1, ...ov.map(x => x.overdue));
-      const ol = (cl.over_limit || []).slice(0, 5);
-      const olmax = Math.max(1, ...ol.map(x => x.over));
-      box.innerHTML =
-        `<div class="cstats">
-          ${cstat(D.t("overdue_exposure"), D.fmtMoney(cl.overdue_total), `${D.fmtNum(cl.customers_evaluated)} ${D.t("customers_no")}`, "red")}
-          ${cstat(D.t("over_limit"), D.fmtNum(cl.over_limit_count), "", cl.over_limit_count ? "amb" : "")}
-          ${cstat(D.t("new_risk"), D.fmtMoney(cl.new_risk_value), `${D.fmtNum(cl.new_risk_count)} ${D.t("orders")}`, cl.new_risk_value ? "red" : "")}
-          ${cstat(D.t("uninvoiced"), D.fmtMoney(cl.uninvoiced_value), `${D.fmtNum(cl.uninvoiced_count)} ${D.t("orders")}`)}
-        </div>
-        <div class="csec"><div class="csec-t">${D.t("dso_title")}</div>
-          ${barline("≤ 30", dso.le30, dmax, "#16a34a")}
-          ${barline("31–60", dso.b31_60, dmax, "#d97706")}
-          ${barline("&gt; 60", dso.gt60, dmax, "#dc2626")}
-        </div>
-        ${ov.length ? `<div class="csec"><div class="csec-t">${D.t("top_overdue")}</div>${ov.map(x => barline(x.name, x.overdue, ovmax, "#dc2626", D.fmtMoney(x.overdue))).join("")}</div>` : ""}
-        ${ol.length ? `<div class="csec"><div class="csec-t">${D.t("over_limit")}</div>${ol.map(x => barline(x.name, x.over, olmax, "#d97706", D.fmtMoney(x.over))).join("")}</div>` : ""}`;
+    function drawTopGovs(conf) {
+      const m = {};
+      conf.forEach(o => { const g = D.govOf(o.city); if (!m[g.key]) m[g.key] = { label: D.govLabel(g.key), orders: 0, value: 0 }; m[g.key].orders++; m[g.key].value += val(o); });
+      const top = Object.values(m).sort((a, b) => b.value - a.value).slice(0, 10);
+      const PAL = ["#2563eb","#7c3aed","#16a34a","#d97706","#dc2626","#0891b2","#db2777","#65a30d","#9333ea","#0d9488"];
+      const ctx = document.getElementById("govChart");
+      if (govChart) govChart.destroy();
+      govChart = new Chart(ctx, {
+        type: "bar",
+        data: { labels: top.map(x => x.label), datasets: [{
+          label: D.t("kpi_value"), data: top.map(x => x.value), backgroundColor: top.map((_, i) => PAL[i % PAL.length]), borderRadius: 5, maxBarThickness: 24 }] },
+        options: { maintainAspectRatio: false, indexAxis: "y",
+          plugins: { legend: { display: false }, tooltip: { callbacks: {
+            label: c => `${D.fmtMoneyFull(c.parsed.x)} · ${D.fmtNum(top[c.dataIndex].orders)} ${D.t("orders")}` } } },
+          scales: { x: { beginAtZero: true, ticks: { callback: v => D.fmtMoney(v) } } } }
+      });
     }
 
-    async function loadReps() {
-      const box = document.getElementById("repBox");
-      let rp;
-      try { rp = await D.api("reps"); } catch (e) { box.innerHTML = `<div class="empty">${D.t("no_data")}</div>`; return; }
-      const reps = (rp.reps || []).slice(0, 8);
-      if (!reps.length) { box.innerHTML = `<div class="empty">${D.t("no_data")}</div>`; return; }
-      const max = Math.max(1, ...reps.map(r => r.value));
-      box.innerHTML = reps.map(r => `<div class="barline">
-        <div class="barline-h"><span>${r.salesperson}</span><span class="muted">${D.fmtMoney(r.value)} · ${D.fmtNum(r.orders)} ${D.t("orders")}${r.conversion_pct != null ? ` · ${r.conversion_pct}%` : ""}${r.risky ? ` · <span class="danger">${D.fmtNum(r.risky)} ${D.t("risky_orders")}</span>` : ""}</span></div>
-        <div class="bar"><div class="bar-f" style="width:${Math.round(r.value / max * 100)}%;background:#2563eb"></div></div>
-      </div>`).join("");
-    }
-
-    async function tick() { await loadSummary(); await loadTodayStatus(); await loadTrends(); await loadCollections(); await loadReps(); await loadAlerts(); }
-    tick();
-    setInterval(tick, D.cfg.POLL_MS);
+    // initial load + periodic refresh of the current window
+    (async function init() { await loadWindow(monthStart, today); render(); })();
+    setInterval(async () => { await loadWindow(loadedFrom || monthStart, loadedTo || today); render(); }, D.cfg.POLL_MS);
   })();
   </script>
 </body>

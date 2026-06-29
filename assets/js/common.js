@@ -13,32 +13,26 @@
       nav_overview: "النظرة العامة",
       nav_alerts: "مركز التنبيهات",
       nav_sales: "المندوبون (مقارنة أسبوعية)",
-      nav_regions: "المدن الأكثر طلباً",
+      nav_regions: "المدن والمحافظات",
       nav_collections: "التحصيل اليومي",
-      nav_acks: "متابعة التنبيهات",
+      nav_debt: "مديونية العملاء",
       lang_btn: "EN",
       live: "مباشر",
-      locked_hint: "مقفل مؤقتاً — قيد التطوير",
       updated: "آخر تحديث",
       loading: "جارٍ التحميل…",
       error_load: "تعذّر الاتصال بمحرك n8n. تحقّق من N8N_BASE في config.js.",
       // overview
-      kpi_today: "طلبات مؤكدة اليوم",
-      kpi_week: "طلبات مؤكدة هذا الأسبوع",
-      kpi_month: "طلبات مؤكدة هذا الشهر",
       kpi_quotes: "عروض أسعار هذا الشهر",
       conversion: "نسبة التحويل",
       kpi_avg: "متوسط قيمة الطلب",
-      kpi_pending: "تنبيهات تحتاج مراجعة",
       kpi_value: "القيمة",
       orders: "طلب",
-      status_title: "حالة طلبات اليوم",
-      st_confirmed: "مؤكدة",
-      st_drafts: "عروض أسعار",
-      st_cancelled: "ملغاة",
-      st_total: "الإجمالي",
-      latest_alerts: "أحدث التنبيهات",
-      view_all: "عرض الكل",
+      ov_sub: "ملخص عالي المستوى — استخدم البحث لتحديث كل البيانات",
+      ov_confirmed: "الطلبات المؤكدة",
+      ov_orders_day: "الطلبات المؤكدة لكل يوم",
+      ov_top_govs: "أعلى المحافظات (قيمة)",
+      ov_customers: "عدد العملاء",
+      ov_status_mix: "توزيع حالات الطلبات",
       no_alerts: "لا توجد تنبيهات حالياً ✅",
       // alerts
       alerts_title: "مركز التنبيهات",
@@ -56,72 +50,61 @@
       warning: "تحذير",
       // sales
       sales_title: "أداء المندوبين",
-      sales_sub: "مبيعات هذا الأسبوع مقارنةً بالأسبوع الماضي",
-      this_month: "الشهر الحالي",
-      last_year: "نفس الفترة العام الماضي",
-      this_week: "هذا الأسبوع",
+      sales_sub: "المبيعات المؤكدة لكل مندوب — أسبوعي وشهري",
       last_week: "الأسبوع الماضي",
-      yoy: "سنوي",
       wow: "أسبوعي",
       mom: "شهري",
-      weekly_trend: "الطلبات المؤكدة أسبوعياً (آخر ١٢ أسبوع)",
-      monthly_trend: "المبيعات المؤكدة شهرياً — مقارنة بالعام الماضي",
-      daily_week: "توزيع الطلبات المؤكدة هذا الأسبوع — لكل يوم",
-      funnel_title: "مسار المبيعات هذا الشهر — من عرض السعر إلى التأكيد",
+      sp_week: "هذا الأسبوع",
+      sp_month: "هذا الشهر",
+      sp_reps: "المندوبون النشطون",
       top_customers: "أكبر العملاء — آخر 30 يوم (مؤكد)",
-      risk_mix: "توزيع المخاطر — آخر 30 يوم",
-      aov_trend: "متوسط قيمة الطلب أسبوعياً (مؤكد)",
-      collections_title: "الائتمان والتحصيل",
-      overdue_exposure: "إجمالي المتأخرات",
-      over_limit: "تجاوزوا حد الائتمان",
       new_risk: "مخاطر جديدة (هذا الشهر)",
       uninvoiced: "مؤكد بلا فاتورة",
-      dso_title: "توزيع أيام التحصيل (DSO)",
-      top_overdue: "أعلى العملاء تأخراً",
-      rep_leaderboard: "ترتيب المندوبين — هذا الشهر (مؤكد)",
-      risky_orders: "بمخاطر",
-      customers_no: "عميل",
       no_data: "لا توجد بيانات بعد",
-      top_areas_title: "أكثر 5 مدن شراءً — آخر 30 يوم",
-      this_year: "هذا العام",
-      last_year_short: "العام الماضي",
-      last_month: "الشهر الماضي",
       orders_count: "عدد الطلبات",
-      rep: "المندوب",
       // regions
-      regions_title: "المدن الأكثر طلباً",
-      regions_sub: "توزيع الطلبات حسب المدينة — آخر 30 يوم",
+      regions_title: "المدن والمحافظات",
+      regions_sub: "الطلبات المؤكدة حسب المحافظة ثم المدينة",
+      govs_title: "المحافظات",
+      cities_title: "المدن",
+      gov_all: "كل المحافظات",
+      cities_count: "عدد المدن",
       region: "المدينة",
       share: "الحصة",
-      crit_orders: "طلبات حرجة",
       // daily collections page (تحصيل)
       coll_title: "تحصيل المندوبين — يومي",
       coll_sub: "المبالغ المُحصَّلة لكل مندوب لكل يوم",
       coll_today: "محصّل اليوم",
-      coll_today_paid: "مؤكد (مسدّد)",
-      coll_today_pending: "قيد التحصيل",
-      coll_paid: "مسدّد",
       coll_pending: "قيد التحصيل",
       coll_total: "الإجمالي",
-      coll_payments_no: "عدد السندات",
-      coll_leaderboard: "ترتيب التحصيل اليوم",
       coll_grid: "التحصيل لكل مندوب — آخر ١٤ يوم",
-      coll_day: "اليوم",
       coll_grand_total: "إجمالي التحصيل",
+      coll_14d: "تحصيل آخر ١٤ يوم",
+      coll_period: "تحصيل الفترة المحددة",
+      coll_mtd: "الشهر حتى الآن",
+      coll_last_month: "الشهر الماضي",
+      coll_mom: "التغير الشهري",
+      coll_sales_month: "مبيعات الفترة",
+      coll_vs_sales: "التحصيل ÷ المبيعات",
+      coll_rep_perf: "أداء المندوبين في التحصيل",
       // customer debt by salesperson (مديونية العملاء)
       debt_title: "مديونية العملاء المستحقة",
-      debt_receivable: "إجمالي المديونية",
-      debt_overdue: "منها متأخّر",
       debt_customers_no: "عدد العملاء المستحقين",
-      debt_pick: "فلترة حسب المندوب",
       debt_total_all: "إجمالي المديونية",
       debt_due_all: "إجمالي المستحق",
       debt_due_pct: "نسبة المستحق من المديونية",
-      debt_all_reps_sub: "كل المندوبين",
       debt_due_sub: "المتأخّر عن السداد",
       debt_due_pct_sub: "المستحق ÷ الإجمالي",
       col_debit: "المديونية",
       col_overdue: "المتأخّر",
+      col_gov: "المحافظة",
+      debt_by_gov: "المتأخرات حسب المحافظة",
+      debt_by_rep: "المتأخرات حسب المندوب",
+      debt_concentration: "تركّز المديونية",
+      debt_top10_sub: "حصة أعلى ١٠ عملاء من إجمالي المتأخرات",
+      debt_page_sub: "أرصدة العملاء المستحقة الحالية — حسب المندوب",
+      debt_table_title: "العملاء المدينون — تفصيل",
+      debt_note_live: "المديونية رصيد لحظي (الوضع الآن)، لذا لا ينطبق فلتر التاريخ عليها.",
       // shared filter bar
       f_from: "من تاريخ",
       f_to: "إلى تاريخ",
@@ -142,13 +125,10 @@
       f_curmonth: "مبيعات الشهر", f_dso: "أيام التحصيل", f_trust: "الثقة",
       f_rank: "تصنيف العميل", f_ontime: "الالتزام بالموعد", f_invoiced: "إجمالي الفوترة",
       f_payment: "طريقة الدفع", f_best: "الأكثر مبيعاً",
-      close: "إغلاق",
       // acknowledgments
       mark_reviewed: "تمّت المراجعة ✓",
       add_note: "إضافة ملاحظة (اختياري)…",
       reviewed_ok: "تم تسجيل المراجعة",
-      acks_title: "متابعة التنبيهات",
-      acks_sub: "مَن راجع التنبيهات وما الملاحظات — وكم تنبيه لم يفتحه أحد",
       ack_total: "إجمالي التنبيهات",
       ack_seen: "تمت مراجعتها",
       ack_ignored: "لم يراجعها أحد",
@@ -156,7 +136,6 @@
       ack_reviews: "مرات المراجعة",
       ack_notes: "الملاحظات",
       ack_status: "الحالة",
-      ack_when: "وقت المراجعة",
       st_seen: "تمت المراجعة",
       st_ignored: "بانتظار المراجعة",
       no_notes: "لا توجد ملاحظات",
@@ -175,30 +154,25 @@
       nav_overview: "Overview",
       nav_alerts: "Alert Center",
       nav_sales: "Salespeople (WoW)",
-      nav_regions: "Top Cities",
+      nav_regions: "Cities & Governorates",
       nav_collections: "Daily Collections",
+      nav_debt: "Customer Debt",
       lang_btn: "ع",
       live: "LIVE",
-      locked_hint: "Locked — coming soon",
       updated: "Updated",
       loading: "Loading…",
       error_load: "Cannot reach the n8n engine. Check N8N_BASE in config.js.",
-      kpi_today: "Confirmed today",
-      kpi_week: "Confirmed this week",
-      kpi_month: "Confirmed this month",
       kpi_quotes: "Quotations this month",
       conversion: "Conversion",
       kpi_avg: "Avg order value",
-      kpi_pending: "Alerts to review",
       kpi_value: "Value",
       orders: "orders",
-      status_title: "Today's orders by status",
-      st_confirmed: "Confirmed",
-      st_drafts: "Quotations",
-      st_cancelled: "Cancelled",
-      st_total: "Total",
-      latest_alerts: "Latest alerts",
-      view_all: "View all",
+      ov_sub: "High-level summary — use search to update all data",
+      ov_confirmed: "Confirmed orders",
+      ov_orders_day: "Confirmed orders per day",
+      ov_top_govs: "Top governorates (value)",
+      ov_customers: "Customers",
+      ov_status_mix: "Order status mix",
       no_alerts: "No alerts right now ✅",
       alerts_title: "Alert Center",
       alerts_sub: "Orders needing human review — sorted by severity",
@@ -214,71 +188,60 @@
       critical: "Critical",
       warning: "Warning",
       sales_title: "Salesperson performance",
-      sales_sub: "This week vs. last week",
-      this_month: "This month",
-      last_year: "Same period last year",
-      this_week: "This week",
+      sales_sub: "Confirmed sales per rep — weekly & monthly",
       last_week: "Last week",
-      yoy: "YoY",
       wow: "WoW",
       mom: "MoM",
-      weekly_trend: "Weekly confirmed orders (last 12 weeks)",
-      monthly_trend: "Monthly confirmed sales — vs last year",
-      daily_week: "This week — confirmed orders by day",
-      funnel_title: "This month's pipeline — quotation to confirmed",
+      sp_week: "This week",
+      sp_month: "This month",
+      sp_reps: "Active reps",
       top_customers: "Top customers — last 30 days (confirmed)",
-      risk_mix: "Risk mix — last 30 days",
-      aov_trend: "Avg order value per week (confirmed)",
-      collections_title: "Credit & collections",
-      overdue_exposure: "Overdue exposure",
-      over_limit: "Over credit limit",
       new_risk: "New risk (this month)",
       uninvoiced: "Confirmed, not invoiced",
-      dso_title: "Collection days (DSO)",
-      top_overdue: "Top overdue customers",
-      rep_leaderboard: "Rep leaderboard — this month (confirmed)",
-      risky_orders: "risky",
-      customers_no: "customers",
       no_data: "No data yet",
-      top_areas_title: "Top 5 cities by purchases — last 30 days",
-      this_year: "This year",
-      last_year_short: "Last year",
-      last_month: "Last month",
       orders_count: "Orders",
-      rep: "Rep",
-      regions_title: "Top cities by demand",
-      regions_sub: "Orders by city — last 30 days",
+      regions_title: "Cities & Governorates",
+      regions_sub: "Confirmed orders by governorate, then city",
+      govs_title: "Governorates",
+      cities_title: "Cities",
+      gov_all: "All governorates",
+      cities_count: "Cities",
       region: "City",
       share: "Share",
-      crit_orders: "Critical orders",
       // daily collections page
       coll_title: "Salesperson collections — daily",
       coll_sub: "Money collected per salesperson, per day",
       coll_today: "Collected today",
-      coll_today_paid: "Cleared (paid)",
-      coll_today_pending: "Pending",
-      coll_paid: "Paid",
       coll_pending: "Pending",
       coll_total: "Total",
-      coll_payments_no: "Payments",
-      coll_leaderboard: "Today's collection leaderboard",
       coll_grid: "Collection per rep — last 14 days",
-      coll_day: "Day",
       coll_grand_total: "Total collected",
+      coll_14d: "Last 14 days collected",
+      coll_period: "Selected period collected",
+      coll_mtd: "Month-to-date",
+      coll_last_month: "Last month",
+      coll_mom: "MoM change",
+      coll_sales_month: "Period sales",
+      coll_vs_sales: "Collected ÷ sales",
+      coll_rep_perf: "Rep collection performance",
       // customer debt by salesperson
       debt_title: "Outstanding customer debt",
-      debt_receivable: "Total receivable",
-      debt_overdue: "of which overdue",
       debt_customers_no: "Customers due",
-      debt_pick: "Filter by salesperson",
       debt_total_all: "Total receivable",
       debt_due_all: "Total due",
       debt_due_pct: "Due ratio",
-      debt_all_reps_sub: "All salespeople",
       debt_due_sub: "Overdue",
       debt_due_pct_sub: "Due ÷ total",
       col_debit: "Receivable",
       col_overdue: "Overdue",
+      col_gov: "Governorate",
+      debt_by_gov: "Overdue by governorate",
+      debt_by_rep: "Overdue by salesperson",
+      debt_concentration: "Debt concentration",
+      debt_top10_sub: "Top 10 customers' share of total overdue",
+      debt_page_sub: "Current outstanding customer balances — by salesperson",
+      debt_table_title: "Debtor customers — detail",
+      debt_note_live: "Debt is a live balance (as of now), so the date filter does not apply to it.",
       // shared filter bar
       f_from: "From",
       f_to: "To",
@@ -298,13 +261,10 @@
       f_curmonth: "Month sales", f_dso: "DSO (days)", f_trust: "Trust",
       f_rank: "Customer rank", f_ontime: "On-time rate", f_invoiced: "Total invoiced",
       f_payment: "Payment method", f_best: "Best sellers",
-      close: "Close",
       // acknowledgments
       mark_reviewed: "Mark reviewed ✓",
       add_note: "Add a note (optional)…",
       reviewed_ok: "Review recorded",
-      acks_title: "Alert follow-up",
-      acks_sub: "Who reviewed alerts and their notes — and how many no one opened",
       ack_total: "Total alerts",
       ack_seen: "Reviewed",
       ack_ignored: "Not reviewed by anyone",
@@ -312,7 +272,6 @@
       ack_reviews: "Reviews",
       ack_notes: "Notes",
       ack_status: "Status",
-      ack_when: "Reviewed at",
       st_seen: "Reviewed",
       st_ignored: "Awaiting review",
       no_notes: "No notes",
@@ -364,14 +323,9 @@
   }
 
   /* ---------------- API (reads Supabase REST directly) ---------------- */
-  // Demo/mock data fully disabled — the dashboard shows ONLY real Supabase data.
-  const DEMO = false;
-
   async function sbGet(pathAndQuery) {
     const base = CFG.SUPABASE_URL.replace(/\/$/, "");
     const res = await fetch(base + "/rest/v1/" + pathAndQuery, {
-      method: "GET",
-      cache: "no-store",
       headers: { apikey: CFG.SUPABASE_ANON_KEY, Authorization: "Bearer " + CFG.SUPABASE_ANON_KEY }
     });
     if (!res.ok) throw new Error("Supabase HTTP " + res.status);
@@ -385,42 +339,12 @@
   }
 
   async function api(endpointKey, params) {
-    // Demo mode: while SUPABASE_ANON_KEY is unconfigured, serve realistic mock data.
-    if (DEMO && window.DASH_MOCK && window.DASH_MOCK[endpointKey]) {
-      await new Promise(r => setTimeout(r, 150));
-      return window.DASH_MOCK[endpointKey](params);
-    }
-
-    if (endpointKey === "summary" || endpointKey === "regions" || endpointKey === "salespeople" || endpointKey === "trends" || endpointKey === "collections" || endpointKey === "reps" || endpointKey === "rep_collections" || endpointKey === "rep_debt") {
+    // Snapshot-backed endpoints (n8n writes these to dashboard_snapshots).
+    if (endpointKey === "collections" || endpointKey === "rep_collections" || endpointKey === "rep_debt") {
       return snapshot(endpointKey);
     }
 
-    if (endpointKey === "today_status") {
-      // Live status breakdown of TODAY's orders, straight from dashboard_orders.
-      // "Today" uses the same Asia/Baghdad day boundary the n8n summary uses, so the
-      // "confirmed" count here matches the "Confirmed today" KPI exactly.
-      const bag = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Baghdad" }));
-      const pad = n => String(n).padStart(2, "0");
-      const dstr = d => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
-      const today = dstr(bag);
-      const tmr = new Date(bag); tmr.setDate(bag.getDate() + 1);
-      const rows = await sbGet(
-        `${CFG.TABLES.orders}?select=state&create_date=gte.${today}&create_date=lt.${dstr(tmr)}&limit=5000`);
-      const c = { sale: 0, done: 0, draft: 0, sent: 0, cancel: 0 };
-      (rows || []).forEach(r => { if (c[r.state] != null) c[r.state]++; });
-      const confirmed = c.sale + c.done;
-      const drafts = c.draft + c.sent;
-      const cancelled = c.cancel;
-      return {
-        generated_at: new Date().toISOString(),
-        confirmed, drafts, cancelled,
-        total: confirmed + drafts + cancelled,
-        by_state: c
-      };
-    }
-
     if (endpointKey === "acks") {
-      if (DEMO) return { acks: JSON.parse(localStorage.getItem("demo_acks") || "[]") };
       const rows = await sbGet(`alert_acks?select=order_id,order_name,level,amount_total,note,created_at&order=created_at.desc&limit=2000`);
       return { acks: rows || [] };
     }
@@ -468,15 +392,8 @@
       amount_total: Number(order.amount_total) || 0,
       note: note || null
     };
-    if (DEMO) {
-      const arr = JSON.parse(localStorage.getItem("demo_acks") || "[]");
-      arr.unshift({ ...row, created_at: new Date().toISOString() });
-      localStorage.setItem("demo_acks", JSON.stringify(arr.slice(0, 500)));
-      return { ok: true };
-    }
     const base = CFG.SUPABASE_URL.replace(/\/$/, "");
     const res = await fetch(base + "/rest/v1/alert_acks", {
-      method: "POST",
       headers: {
         apikey: CFG.SUPABASE_ANON_KEY, Authorization: "Bearer " + CFG.SUPABASE_ANON_KEY,
         "Content-Type": "application/json", Prefer: "return=minimal"
@@ -536,19 +453,17 @@
     setTimeout(() => { el.classList.remove("show"); setTimeout(() => el.remove(), 300); }, 6000);
   }
 
-  /* ---------------- chrome (header + nav) ---------------- */
+  /* ---------------- chrome (header + nav) ----------------
+     Pages are grouped by purpose; the nav draws a subtle divider between groups:
+     main · sales (geography + people) · money (cash in + owed) · risk (alerts). */
   const PAGES = [
-    { key: "nav_overview", href: "index.html", id: "overview" },
-    { key: "nav_alerts", href: "alerts.html", id: "alerts" },
-    { key: "nav_sales", href: "salespeople.html", id: "sales" },
-    { key: "nav_collections", href: "collections.html", id: "collections" },
-    { key: "nav_regions", href: "regions.html", id: "regions" },
-    { key: "nav_acks", href: "acknowledgments.html", id: "acks" }
+    { key: "nav_overview", href: "index.html", id: "overview", group: "main" },
+    { key: "nav_regions", href: "regions.html", id: "regions", group: "sales" },
+    { key: "nav_sales", href: "salespeople.html", id: "sales", group: "sales" },
+    { key: "nav_collections", href: "collections.html", id: "collections", group: "money" },
+    { key: "nav_debt", href: "debt.html", id: "debt", group: "money" },
+    { key: "nav_alerts", href: "alerts.html", id: "alerts", group: "risk" }
   ];
-
-  // Focus mode: while we build out the Overview, every other page is locked
-  // (shown in the nav but not clickable). Set to [] to unlock everything.
-  const LOCKED_IDS = [];
 
   function renderSoundBtn() {
     const b = document.getElementById("soundBtn");
@@ -573,9 +488,10 @@
           </div>
         </div>
         <nav class="hd-nav">
-          ${PAGES.map(p => LOCKED_IDS.includes(p.id)
-            ? `<span class="nav-locked" title="${t("locked_hint")}">🔒 ${t(p.key)}</span>`
-            : `<a href="${p.href}" class="${p.id === activeId ? "active" : ""}">${t(p.key)}</a>`).join("")}
+          ${PAGES.map((p, i) => {
+            const sep = (i > 0 && PAGES[i - 1].group !== p.group) ? `<span class="nav-sep"></span>` : "";
+            return sep + `<a href="${p.href}" class="${p.id === activeId ? "active" : ""}">${t(p.key)}</a>`;
+          }).join("")}
         </nav>
         <div class="hd-tools">
           <span class="live-dot"><i></i>${t("live")}</span>
@@ -661,12 +577,143 @@
     };
   }
 
+  /* ---------------- governorate map (city -> Iraqi governorate) ----------------
+     The Odoo `city` field is messy free-text mixing real governorates with
+     districts/neighbourhoods. This dictionary buckets the known values into the
+     18 governorates. Unrecognised cities fall back to "غير محدد / Unknown".
+     To fix a misfiled city: add it to CITY2GOV with the right gov code. */
+  const GOV = {
+    baghdad:  { ar: "بغداد",       en: "Baghdad" },
+    basra:    { ar: "البصرة",      en: "Basra" },
+    nineveh:  { ar: "نينوى",       en: "Nineveh" },
+    erbil:    { ar: "أربيل",       en: "Erbil" },
+    kirkuk:   { ar: "كركوك",       en: "Kirkuk" },
+    najaf:    { ar: "النجف",       en: "Najaf" },
+    karbala:  { ar: "كربلاء",      en: "Karbala" },
+    anbar:    { ar: "الأنبار",     en: "Anbar" },
+    dhiqar:   { ar: "ذي قار",      en: "Dhi Qar" },
+    babil:    { ar: "بابل",        en: "Babil" },
+    diyala:   { ar: "ديالى",       en: "Diyala" },
+    wasit:    { ar: "واسط",        en: "Wasit" },
+    saladin:  { ar: "صلاح الدين",  en: "Saladin" },
+    sulaymaniyah: { ar: "السليمانية", en: "Sulaymaniyah" },
+    dohuk:    { ar: "دهوك",        en: "Dohuk" },
+    muthanna: { ar: "المثنى",      en: "Muthanna" },
+    qadisiyah:{ ar: "القادسية",    en: "Qadisiyah" },
+    maysan:   { ar: "ميسان",       en: "Maysan" },
+    unknown:  { ar: "غير محدد",    en: "Unknown" }
+  };
+  const CITY2GOV = {
+    // Baghdad + its districts
+    "بغداد": "baghdad", "الكرخ": "baghdad", "رصافة": "baghdad", "الرصافة": "baghdad",
+    "المنصور": "baghdad", "الدوره": "baghdad", "الدورة": "baghdad", "الدوره حي دجلة": "baghdad",
+    "ابو غريب": "baghdad", "كاظمية": "baghdad", "الكاظمية": "baghdad", "غزالية": "baghdad",
+    "الغزالية": "baghdad", "شارع فلسطين": "baghdad", "رسالة": "baghdad", "الرسالة": "baghdad",
+    "المدائن": "baghdad", "كرادة": "baghdad", "كراده": "baghdad", "طوبجي": "baghdad",
+    "الجادرية": "baghdad", "حي الجامعه": "baghdad", "المأمون": "baghdad", "الخضراء": "baghdad",
+    "الشرطة الخامسة": "baghdad", "الزعفرانية": "baghdad", "زعفرانيه": "baghdad", "الحسينية": "baghdad",
+    // Nineveh (Mosul)
+    "الموصل": "nineveh", "الحمدانية": "nineveh", "المشراق": "nineveh", "باب السراي": "nineveh",
+    // Erbil
+    "اربيل": "erbil", "أربيل": "erbil", "عينكاوة": "erbil", "شقلاوة": "erbil",
+    // Kirkuk
+    "كركوك": "kirkuk", "الحويجة": "kirkuk", "داقوق": "kirkuk", "الدبس": "kirkuk",
+    // Najaf
+    "النجف": "najaf", "المشخاب": "najaf", "الكوفة": "najaf",
+    // Karbala
+    "كربلاء": "karbala", "عين التمر": "karbala", "الهندية": "karbala",
+    // Anbar
+    "رمادي": "anbar", "الرمادي": "anbar", "هيت": "anbar", "فلوجة": "anbar", "الفلوجة": "anbar",
+    "فلوجه": "anbar", "عامرية الفلوجة": "anbar", "الخالديه": "anbar", "خالدية": "anbar",
+    "الخالدية": "anbar", "حديثة": "anbar", "راوه": "anbar", "الكرمة": "anbar", "البغدادي": "anbar",
+    "حقلانية": "anbar", "عنه": "anbar", "القائم": "anbar", "الحبانية": "anbar", "المقام": "anbar",
+    // Dhi Qar
+    "الناصرية": "dhiqar", "الناصريه": "dhiqar", "الرفاعي": "dhiqar", "الشطرة": "dhiqar", "سوق الشيوخ": "dhiqar",
+    // Babil
+    "الحلة": "babil", "حلة": "babil", "المسيب": "babil", "مسيب": "babil", "الهاشمية": "babil",
+    "المحاويل": "babil", "القاسم": "babil", "بابل": "babil",
+    // Diyala
+    "ديالى": "diyala", "بعقوبة": "diyala", "المقدادية": "diyala", "الخالص": "diyala", "بلدروز": "diyala",
+    // Wasit
+    "كوت": "wasit", "الكوت": "wasit", "الصويرة": "wasit", "صويرة": "wasit", "النعمانية": "wasit",
+    "الحي": "wasit", "العزيزية": "wasit", "بدرة": "wasit",
+    // Saladin
+    "تكريت": "saladin", "سامراء": "saladin", "بلد": "saladin", "بيجي": "saladin", "العلم": "saladin",
+    "الشرقاط": "saladin", "الدجيل": "saladin", "الضلوعية": "saladin", "بلد روز": "saladin",
+    // Basra
+    "البصرة": "basra", "الجبيلة": "basra", "الزبير": "basra", "ابو الخصيب": "basra", "القرنة": "basra", "المعقل": "basra",
+    // Qadisiyah
+    "الديوانية": "qadisiyah", "ديوانية": "qadisiyah", "عفك": "qadisiyah", "الشامية": "qadisiyah",
+    // Muthanna
+    "السماوة": "muthanna", "السماوه": "muthanna", "الرميثة": "muthanna", "الخضر": "muthanna",
+    // Dohuk
+    "دهوك": "dohuk", "زاخو": "dohuk", "زاويته": "dohuk",
+    // Maysan
+    "العمارة": "maysan", "ميسان": "maysan", "المجر": "maysan", "قلعة صالح": "maysan",
+    // Sulaymaniyah
+    "السليمانية": "sulaymaniyah", "السليمانيه": "sulaymaniyah"
+  };
+  function govOf(city) {
+    const raw = (city == null ? "" : String(city)).trim();
+    if (!raw || raw === "—") return { key: "unknown", ar: GOV.unknown.ar, en: GOV.unknown.en };
+    let code = CITY2GOV[raw];
+    if (!code) { const n = raw.replace(/^ال/, ""); code = CITY2GOV[n] || CITY2GOV["ال" + n]; }
+    code = code || "unknown";
+    return { key: code, ar: GOV[code].ar, en: GOV[code].en };
+  }
+  function govLabel(code) { const g = GOV[code] || GOV.unknown; return isAR() ? g.ar : g.en; }
+
+  /* ---------------- raw-table loaders (for date-aware, client-side aggregation) ----
+     Read dashboard_orders / dashboard_payments directly (anon key + RLS) with an
+     optional date window, paginating past PostgREST's 1000-row cap. Pages use these
+     so a date filter genuinely recomputes every KPI/chart instead of relying on the
+     fixed-window snapshots. */
+  function nextDay(ymd) { const d = new Date(ymd + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10); }
+  async function sbGetAll(pathAndQuery) {
+    const base = CFG.SUPABASE_URL.replace(/\/$/, "");
+    const PAGE = 1000; let offset = 0; const out = [];
+    for (;;) {
+      const sep = pathAndQuery.includes("?") ? "&" : "?";
+      const res = await fetch(base + "/rest/v1/" + pathAndQuery + `${sep}limit=${PAGE}&offset=${offset}`, {
+        method: "GET", cache: "no-store",
+        headers: { apikey: CFG.SUPABASE_ANON_KEY, Authorization: "Bearer " + CFG.SUPABASE_ANON_KEY }
+      });
+      if (!res.ok) throw new Error("Supabase HTTP " + res.status);
+      const rows = await res.json();
+      out.push(...rows);
+      if (rows.length < PAGE) break;
+      offset += PAGE;
+      if (offset > 100000) break;
+    }
+    return out;
+  }
+  async function loadOrders(o) {
+    o = o || {};
+    const sel = o.select || "order_id,order_name,partner_name,salesperson,user_id,city,state,type_name,amount_total,level,invoice_count,date_order,create_date,customer";
+    const f = o.dateField || "create_date";
+    let q = `${CFG.TABLES.orders}?select=${sel}&order=${f}.desc`;
+    if (o.from) q += `&${f}=gte.${o.from}`;
+    if (o.to)   q += `&${f}=lt.${nextDay(o.to)}`;
+    const rows = await sbGetAll(q);
+    return rows.map(r => ({ ...r, amount_total: Number(r.amount_total) || 0 }));
+  }
+  async function loadPayments(o) {
+    o = o || {};
+    const sel = o.select || "payment_id,date,amount,state,salesperson,user_id,partner_name,partner_id,journal";
+    let q = `dashboard_payments?select=${sel}&order=date.desc`;
+    if (o.from) q += `&date=gte.${o.from}`;
+    if (o.to)   q += `&date=lt.${nextDay(o.to)}`;
+    const rows = await sbGetAll(q);
+    return rows.map(r => ({ ...r, amount: Number(r.amount) || 0 }));
+  }
+
   /* ---------------- expose ---------------- */
   window.DASH = {
     t, isAR, lang: () => LANG,
     fmtNum, fmtMoney, fmtMoneyFull, fmtDate, fmtTime,
     api, ackAlert, beep, toast, notify, buildChrome, setUpdated, renderSoundBtn,
     stateLabel, trustLabel, filterBar,
+    govOf, govLabel, GOV, loadOrders, loadPayments, sbGetAll, nextDay,
     cfg: CFG
   };
 })();

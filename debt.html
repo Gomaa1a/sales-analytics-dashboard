@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dabboos — Credit & Collections</title>
+  <link rel="stylesheet" href="assets/css/style.css?v=18" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧾</text></svg>" />
+</head>
+<body>
+  <header id="appHeader" class="app"></header>
+  <main class="wrap">
+    <div class="page-head">
+      <h1 id="pgTitle"></h1>
+      <p id="pgSub"></p>
+    </div>
+
+    <div class="filters" id="fbHost"></div>
+    <p id="liveNote" class="muted" style="margin:-6px 2px 12px;font-size:12px"></p>
+
+    <div id="kpis" class="kpi-grid"></div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-head"><h2 id="govTitle"></h2></div>
+        <div class="panel-body"><div class="chart-box"><canvas id="govChart"></canvas></div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h2 id="repTitle"></h2></div>
+        <div class="panel-body"><div class="chart-box"><canvas id="repChart"></canvas></div></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2 id="tblTitle"></h2></div>
+      <div class="panel-body" style="padding:0"><div id="debtBox"></div></div>
+    </div>
+
+    <div class="foot">Dabboos Sales Command Center · Odoo → n8n → Supabase</div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="assets/js/config.js?v=18"></script>
+  <script src="assets/js/common.js?v=18"></script>
+  <script src="assets/js/order-modal.js?v=18"></script>
+  <script>
+  (function () {
+    const D = window.DASH;
+    D.buildChrome("debt");
+    document.getElementById("pgTitle").textContent = D.t("debt_title");
+    document.getElementById("pgSub").textContent = D.t("debt_page_sub");
+    document.getElementById("tblTitle").textContent = D.t("debt_table_title");
+    document.getElementById("liveNote").textContent = D.t("debt_note_live");
+    document.getElementById("govTitle").textContent = D.t("debt_by_gov");
+    document.getElementById("repTitle").textContent = D.t("debt_by_rep");
+
+    const kpi = (cls, label, num, sub) =>
+      `<div class="kpi ${cls}"><div class="kpi-l">${label}</div><div class="kpi-n">${num}</div><div class="kpi-sub">${sub || "&nbsp;"}</div></div>`;
+    const PAL = ["#dc2626","#ea580c","#d97706","#ca8a04","#16a34a","#0891b2","#2563eb","#7c3aed","#db2777","#9333ea"];
+
+    let rows = [];            // flattened debtors (one per customer), tagged with salesperson + rep totals
+    let repTotals = [];       // [{salesperson, overdue}]
+    let order = null;         // collections snapshot (order-based metrics)
+    let govChart = null, repChart = null;
+
+    // Debt is point-in-time → date filter hidden; rep + customer search active.
+    const fb = D.filterBar(document.getElementById("fbHost"), { date: false, rep: true, customer: true }, render);
+
+    function render() {
+      const box = document.getElementById("debtBox");
+      const kbox = document.getElementById("kpis");
+      if (!rows.length) { kbox.innerHTML = ""; box.innerHTML = `<div class="empty">${D.t("no_data")}</div>`; fb.setCount(0); return; }
+
+      const f = rows.filter(r => fb.match(r, { rep: "salesperson", cust: "name" }));
+      fb.setCount(f.length);
+
+      const receivable = f.reduce((s, r) => s + r.receivable, 0);
+      const overdue = f.reduce((s, r) => s + r.overdue, 0);
+      const duePct = receivable > 0 ? Math.round(overdue / receivable * 100) : 0;
+      // concentration: top-10 debtors' share of overdue
+      const byOver = [...f].sort((a, b) => b.overdue - a.overdue);
+      const top10 = byOver.slice(0, 10).reduce((s, r) => s + r.overdue, 0);
+      const conc = overdue > 0 ? Math.round(top10 / overdue * 100) : 0;
+
+      kbox.innerHTML =
+        kpi("k-vio", D.t("debt_total_all"), D.fmtMoney(receivable), `${D.fmtNum(f.length)} ${D.t("debt_customers_no")}`) +
+        kpi("k-red", D.t("debt_due_all"), D.fmtMoney(overdue), D.t("debt_due_sub")) +
+        kpi("k-amb", D.t("debt_due_pct"), duePct + "%", D.t("debt_due_pct_sub")) +
+        kpi("", D.t("debt_concentration"), conc + "%", D.t("debt_top10_sub")) +
+        kpi("k-red", D.t("new_risk"), order ? D.fmtMoney(order.new_risk_value) : "—", order ? `${D.fmtNum(order.new_risk_count)} ${D.t("orders")}` : "&nbsp;") +
+        kpi("", D.t("uninvoiced"), order ? D.fmtMoney(order.uninvoiced_value) : "—", order ? `${D.fmtNum(order.uninvoiced_count)} ${D.t("orders")}` : "&nbsp;");
+
+      drawGov(f);
+      drawReps(f);
+
+      const top = byOver.slice(0, 200);
+      box.innerHTML = `
+        <table class="dt">
+          <thead><tr>
+            <th>${D.t("col_customer")}</th><th>${D.t("col_rep")}</th>
+            <th>${D.t("col_gov")}</th><th>${D.t("col_city")}</th>
+            <th>${D.t("col_debit")}</th><th>${D.t("col_overdue")}</th>
+          </tr></thead>
+          <tbody>
+          ${top.map(c => `<tr>
+            <td class="strong">${c.name}</td>
+            <td class="muted">${c.salesperson}</td>
+            <td class="muted">${D.govLabel(D.govOf(c.city).key)}</td>
+            <td class="muted">${c.city || "—"}</td>
+            <td class="amt">${D.fmtMoney(c.receivable)}</td>
+            <td class="amt">${c.overdue > 0 ? `<span class="danger">${D.fmtMoney(c.overdue)}</span>` : `<span class="muted">0</span>`}</td>
+          </tr>`).join("")}
+          </tbody>
+        </table>`;
+    }
+
+    function drawGov(f) {
+      const m = {};
+      f.forEach(r => { if (r.overdue <= 0) return; const g = D.govOf(r.city); if (!m[g.key]) m[g.key] = { label: D.govLabel(g.key), overdue: 0, customers: 0 }; m[g.key].overdue += r.overdue; m[g.key].customers++; });
+      const top = Object.values(m).sort((a, b) => b.overdue - a.overdue).slice(0, 10);
+      const ctx = document.getElementById("govChart");
+      if (govChart) govChart.destroy();
+      govChart = new Chart(ctx, {
+        type: "bar",
+        data: { labels: top.map(x => x.label), datasets: [{ data: top.map(x => x.overdue),
+          backgroundColor: top.map((_, i) => PAL[i % PAL.length]), borderRadius: 5 }] },
+        options: { indexAxis: "y", maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { callbacks: {
+            label: c => `${D.fmtMoneyFull(c.parsed.x)} · ${D.fmtNum(top[c.dataIndex].customers)} ${D.t("debt_customers_no")}` } } },
+          scales: { x: { beginAtZero: true, ticks: { callback: v => D.fmtMoney(v) } } } }
+      });
+    }
+
+    function drawReps(f) {
+      const m = {};
+      f.forEach(r => { if (r.overdue <= 0) return; if (!m[r.salesperson]) m[r.salesperson] = 0; m[r.salesperson] += r.overdue; });
+      const top = Object.entries(m).map(([k, v]) => ({ name: k, overdue: v })).sort((a, b) => b.overdue - a.overdue).slice(0, 10);
+      const ctx = document.getElementById("repChart");
+      if (repChart) repChart.destroy();
+      repChart = new Chart(ctx, {
+        type: "bar",
+        data: { labels: top.map(x => x.name), datasets: [{ data: top.map(x => x.overdue),
+          backgroundColor: "#dc2626", borderRadius: 5, maxBarThickness: 22 }] },
+        options: { indexAxis: "y", maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { callbacks: {
+            label: c => D.fmtMoneyFull(c.parsed.x) } } },
+          scales: { x: { beginAtZero: true, ticks: { callback: v => D.fmtMoney(v) } } } }
+      });
+    }
+
+    async function tick() {
+      let snap;
+      try { snap = await D.api("rep_debt"); }
+      catch (e) { document.getElementById("debtBox").innerHTML = `<div class="err">${D.t("error_load")}</div>`; return; }
+      try { order = await D.api("collections"); } catch (e) { order = null; }
+      D.setUpdated(snap.generated_at);
+      rows = [];
+      (snap.reps || []).forEach(r => (r.customers || []).forEach(c => {
+        rows.push({ name: c.name, city: c.city, receivable: c.receivable || 0, overdue: c.overdue || 0, salesperson: r.salesperson });
+      }));
+      fb.setReps((snap.reps || []).map(r => r.salesperson));
+      render();
+    }
+    tick();
+    setInterval(tick, D.cfg.POLL_MS * 5);
+  })();
+  </script>
+</body>
+</html>
