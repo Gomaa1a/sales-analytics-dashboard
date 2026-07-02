@@ -5,6 +5,16 @@
 (function () {
   const CFG = window.DASH_CONFIG;
 
+  // Disable Chart.js animations globally. On a live dashboard that re-renders
+  // every poll, animations add CPU/GPU churn, make the page feel busy, and keep
+  // the renderer from ever going idle (which breaks embedded previews and screen
+  // capture). Charts still redraw instantly on data change. common.js always
+  // loads AFTER chart.umd.min.js on the pages that use charts.
+  if (window.Chart && window.Chart.defaults) {
+    window.Chart.defaults.animation = false;
+    window.Chart.defaults.animations = false;
+  }
+
   /* ---------------- i18n ---------------- */
   const I18N = {
     ar: {
@@ -20,7 +30,7 @@
       live: "مباشر",
       updated: "آخر تحديث",
       loading: "جارٍ التحميل…",
-      error_load: "تعذّر الاتصال بمحرك n8n. تحقّق من N8N_BASE في config.js.",
+      error_load: "تعذّر تحميل البيانات من Supabase. تحقّق من الاتصال أو من إعدادات config.js.",
       // overview
       kpi_quotes: "عروض أسعار هذا الشهر",
       conversion: "نسبة التحويل",
@@ -81,6 +91,9 @@
       // regions
       regions_title: "المدن والمحافظات",
       regions_sub: "الطلبات المؤكدة حسب المحافظة ثم المدينة",
+      region_basis: "الأساس: الطلبات المؤكدة (sale/done) بقيمة شاملة الضريبة، حسب تاريخ إنشاء الطلب. قد تختلف عن «تحليل الفواتير» في أودو الذي يعتمد على الفواتير والقيمة غير الشاملة للضريبة.",
+      unmapped: "مدن غير مصنّفة",
+      unmapped_note: "طلبات لم نستطع ربط مدينتها بمحافظة (اسم المدينة غير معروف في القاموس). راجع أسماء المدن في أودو أو أضِفها للقاموس.",
       govs_title: "المحافظات",
       cities_title: "المدن",
       gov_all: "كل المحافظات",
@@ -177,7 +190,7 @@
       live: "LIVE",
       updated: "Updated",
       loading: "Loading…",
-      error_load: "Cannot reach the n8n engine. Check N8N_BASE in config.js.",
+      error_load: "Could not load data from Supabase. Check your connection or config.js.",
       kpi_quotes: "Quotations this month",
       conversion: "Conversion",
       kpi_avg: "Avg order value",
@@ -234,6 +247,9 @@
       orders_count: "Orders",
       regions_title: "Cities & Governorates",
       regions_sub: "Confirmed orders by governorate, then city",
+      region_basis: "Basis: confirmed orders (sale/done), tax-inclusive value, by order creation date. This can differ from Odoo's Invoice Analysis, which is invoice-based and untaxed.",
+      unmapped: "Unmapped cities",
+      unmapped_note: "Orders whose city could not be matched to a governorate (city name not in the dictionary). Review the city names in Odoo or add them to the dictionary.",
       govs_title: "Governorates",
       cities_title: "Cities",
       gov_all: "All governorates",
@@ -322,6 +338,17 @@
   const t = (k) => I18N[LANG][k] !== undefined ? I18N[LANG][k] : k;
   const isAR = () => LANG === "ar";
 
+  /* ---------------- security: HTML escaping ----------------
+     Every value that originates in the database (customer/rep/city names,
+     order names, alert notes, risk reasons) is user-controlled free text and
+     MUST be escaped before it is placed into innerHTML. The alert "note" field
+     in particular is written anonymously via ackAlert(), so an unescaped render
+     is a stored-XSS hole. Use D.esc() around ANY DB string in a template. */
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, c =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
   /* ---------------- formatting ---------------- */
   function fmtNum(n) {
     if (n === null || n === undefined || n === false || isNaN(n)) return "—";
@@ -387,7 +414,7 @@
       const rows = await sbGet(
         `${CFG.TABLES.orders}?select=${sel}&level=in.(critical,warning)&create_date=gte.${since}` +
         `&order=date_order.desc,create_date.desc&limit=300`);
-      const alerts = (rows || []).map(r => ({ ...r, amount_total: Number(r.amount_total) || 0 }));
+      const alerts = dedupeBy(rows || [], "order_id").map(r => ({ ...r, amount_total: Number(r.amount_total) || 0 }));
       const critical = alerts.filter(a => a.level === "critical").length;
       return { generated_at: new Date().toISOString(), currency: CFG.CURRENCY, count: alerts.length,
         critical, warning: alerts.length - critical, alerts };
@@ -685,13 +712,47 @@
     // Sulaymaniyah
     "السليمانية": "sulaymaniyah", "السليمانيه": "sulaymaniyah"
   };
+  // Normalize a messy free-text Arabic city string so more values match:
+  // strip diacritics/tatweel, unify alef/ya/hamza/ta-marbuta spellings, collapse
+  // whitespace, then drop a leading "ال" and common location-type prefixes.
+  function normCity(s) {
+    let n = String(s == null ? "" : s)
+      .replace(/[ً-ْـ]/g, "")                   // tashkeel + tatweel
+      .replace(/[أإآٱ]/g, "ا")                   // alef variants -> ا
+      .replace(/[ىیۍ]/g, "ي")                    // alef maqsura + Persian yeh -> ي
+      .replace(/ک/g, "ك")                        // Persian kaf -> Arabic kaf
+      .replace(/ؤ/g, "و").replace(/ئ/g, "ي")     // hamza carriers
+      .replace(/ة/g, "ه")                        // ta marbuta -> ha
+      .replace(/\s+/g, " ")
+      .trim();
+    // Strip location-type prefixes. Written in NORMALIZED form (ة already -> ه)
+    // so the match still works after the character folding above.
+    n = n.replace(/^(محافظه|قضاء|ناحيه|مدينه|مركز|منطقه|حي)\s+/, "");
+    n = n.replace(/^ال/, "");
+    return n.trim();
+  }
+  // Build a normalized lookup ONCE: known city spellings + the governorate
+  // names themselves (so a city value that is actually a governorate maps too).
+  const CITY2GOV_N = {};
+  Object.keys(CITY2GOV).forEach(k => { const nk = normCity(k); if (nk) CITY2GOV_N[nk] = CITY2GOV[k]; });
+  Object.keys(GOV).forEach(code => { if (code === "unknown") return; const nk = normCity(GOV[code].ar); if (nk && !CITY2GOV_N[nk]) CITY2GOV_N[nk] = code; });
+  function govResult(code) { return { key: code, ar: GOV[code].ar, en: GOV[code].en }; }
   function govOf(city) {
     const raw = (city == null ? "" : String(city)).trim();
-    if (!raw || raw === "—") return { key: "unknown", ar: GOV.unknown.ar, en: GOV.unknown.en };
-    let code = CITY2GOV[raw];
-    if (!code) { const n = raw.replace(/^ال/, ""); code = CITY2GOV[n] || CITY2GOV["ال" + n]; }
-    code = code || "unknown";
-    return { key: code, ar: GOV[code].ar, en: GOV[code].en };
+    if (!raw || raw === "—") return govResult("unknown");
+    if (CITY2GOV[raw]) return govResult(CITY2GOV[raw]);        // exact original (fast path)
+    const n = normCity(raw);
+    if (n && CITY2GOV_N[n]) return govResult(CITY2GOV_N[n]);   // normalized match
+    // token match: a known place name appearing inside a longer free-text value
+    // (e.g. "بغداد - الكرخ"). Require length >= 3 to avoid accidental hits.
+    if (n) {
+      const padded = " " + n + " ";
+      for (const key in CITY2GOV_N) {
+        if (key.length < 3) continue;
+        if (n === key || padded.includes(" " + key + " ")) return govResult(CITY2GOV_N[key]);
+      }
+    }
+    return govResult("unknown");
   }
   function govLabel(code) { const g = GOV[code] || GOV.unknown; return isAR() ? g.ar : g.en; }
 
@@ -701,6 +762,21 @@
      so a date filter genuinely recomputes every KPI/chart instead of relying on the
      fixed-window snapshots. */
   function nextDay(ymd) { const d = new Date(ymd + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10); }
+  // Defensive de-duplication: if the n8n sync ever appends instead of upserting,
+  // the same order/payment can appear more than once and inflate every count and
+  // total. Rows arrive newest-first, so we keep the FIRST occurrence per id.
+  // NOTE: this only masks duplicates in the UI — the real fix is an upsert on the
+  // primary key in the n8n pipeline (see docs/KNOWN_ISSUES.md).
+  function dedupeBy(rows, idField) {
+    const seen = new Set(); const out = [];
+    for (const r of rows) {
+      const id = r ? r[idField] : null;
+      if (id == null) { out.push(r); continue; }
+      if (seen.has(id)) continue;
+      seen.add(id); out.push(r);
+    }
+    return out;
+  }
   async function sbGetAll(pathAndQuery) {
     const base = CFG.SUPABASE_URL.replace(/\/$/, "");
     const PAGE = 1000; let offset = 0; const out = [];
@@ -726,7 +802,7 @@
     let q = `${CFG.TABLES.orders}?select=${sel}&order=${f}.desc`;
     if (o.from) q += `&${f}=gte.${o.from}`;
     if (o.to)   q += `&${f}=lt.${nextDay(o.to)}`;
-    const rows = await sbGetAll(q);
+    const rows = dedupeBy(await sbGetAll(q), "order_id");
     return rows.map(r => ({ ...r, amount_total: Number(r.amount_total) || 0 }));
   }
   async function loadPayments(o) {
@@ -735,13 +811,13 @@
     let q = `dashboard_payments?select=${sel}&order=date.desc`;
     if (o.from) q += `&date=gte.${o.from}`;
     if (o.to)   q += `&date=lt.${nextDay(o.to)}`;
-    const rows = await sbGetAll(q);
+    const rows = dedupeBy(await sbGetAll(q), "payment_id");
     return rows.map(r => ({ ...r, amount: Number(r.amount) || 0 }));
   }
 
   /* ---------------- expose ---------------- */
   window.DASH = {
-    t, isAR, lang: () => LANG,
+    t, isAR, lang: () => LANG, esc,
     fmtNum, fmtMoney, fmtMoneyFull, fmtDate, fmtTime,
     api, ackAlert, beep, toast, notify, buildChrome, setUpdated, renderSoundBtn,
     stateLabel, trustLabel, filterBar,

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Alert Center</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=20" />
+  <link rel="stylesheet" href="assets/css/style.css?v=21" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚨</text></svg>" />
 </head>
 <body>
@@ -36,9 +36,9 @@
     <div class="foot">Dabboos Sales Command Center · n8n + Odoo</div>
   </main>
 
-  <script src="assets/js/config.js?v=20"></script>
-  <script src="assets/js/common.js?v=20"></script>
-  <script src="assets/js/order-modal.js?v=20"></script>
+  <script src="assets/js/config.js?v=21"></script>
+  <script src="assets/js/common.js?v=21"></script>
+  <script src="assets/js/order-modal.js?v=21"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -119,13 +119,13 @@
             const isSeen = acks.length > 0;
             const last = isSeen ? acks[0].created_at : null;
             return `<tr>
-              <td><a class="order-link" data-order-id="${r.order_id}">${r.order_name || ("#" + r.order_id)}</a>
+              <td><a class="order-link" data-order-id="${D.esc(r.order_id)}">${D.esc(r.order_name || ("#" + r.order_id))}</a>
                   <div>${r.level === "critical" ? `<span class="badge b-crit">${D.t("critical")}</span>` : `<span class="badge b-warn">${D.t("warning")}</span>`}</div></td>
-              <td>${r.partner_name}</td>
-              <td>${r.salesperson}</td>
-              <td class="muted">${r.city}</td>
+              <td>${D.esc(r.partner_name)}</td>
+              <td>${D.esc(r.salesperson)}</td>
+              <td class="muted">${D.esc(r.city)}</td>
               <td class="amt">${D.fmtMoney(r.amount_total)}</td>
-              <td><div class="reasons">${(r.reasons || []).map(x => `<span class="r-${x.severity}">${x.severity === "critical" ? "🔴" : "🟡"} ${D.isAR() ? x.ar : x.en}</span>`).join("")}</div></td>
+              <td><div class="reasons">${(r.reasons || []).map(x => `<span class="r-${D.esc(x.severity)}">${x.severity === "critical" ? "🔴" : "🟡"} ${D.esc(D.isAR() ? x.ar : x.en)}</span>`).join("")}</div></td>
               <td>${isSeen
                 ? `<span class="badge b-ok">${D.t("st_seen")}</span><div class="muted" style="margin-top:4px;font-size:12px">${D.t("ack_reviews")}: ${D.fmtNum(acks.length)} · ${D.fmtDate(last)} ${D.fmtTime(last)}</div>`
                 : `<span class="badge b-warn">${D.t("st_ignored")}</span>`}</td>
@@ -145,10 +145,10 @@
         ${notes.slice(0, 50).map(a => `
           <div class="note-item">
             <div class="note-head">
-              <a class="order-link" data-order-id="${a.order_id}">${a.order_name || ("#" + a.order_id)}</a>
+              <a class="order-link" data-order-id="${D.esc(a.order_id)}">${D.esc(a.order_name || ("#" + a.order_id))}</a>
               <span class="muted">${D.fmtDate(a.created_at)} · ${D.fmtTime(a.created_at)}</span>
             </div>
-            <div class="note-body">${a.note}</div>
+            <div class="note-body">${D.esc(a.note)}</div>
           </div>`).join("")}
         </div>` : `<div class="empty">${D.t("no_notes")}</div>`;
     }
@@ -169,7 +169,7 @@
         if (!firstLoad && fresh.length) {
           D.beep();
           const f = fresh[0];
-          D.toast(`<b>🚨 ${D.t("critical")} — ${f.order_name || ("#" + f.order_id)}</b>${f.partner_name} · ${D.fmtMoney(f.amount_total)}`, "critical");
+          D.toast(`<b>🚨 ${D.t("critical")} — ${D.esc(f.order_name || ("#" + f.order_id))}</b>${D.esc(f.partner_name)} · ${D.fmtMoney(f.amount_total)}`, "critical");
           D.notify(D.t("alerts_title"), `${f.order_name || f.order_id} · ${f.partner_name}`);
         }
         firstLoad = false;

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Credit & Collections</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=20" />
+  <link rel="stylesheet" href="assets/css/style.css?v=21" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧾</text></svg>" />
 </head>
 <body>
@@ -40,9 +40,9 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=20"></script>
-  <script src="assets/js/common.js?v=20"></script>
-  <script src="assets/js/order-modal.js?v=20"></script>
+  <script src="assets/js/config.js?v=21"></script>
+  <script src="assets/js/common.js?v=21"></script>
+  <script src="assets/js/order-modal.js?v=21"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -103,10 +103,10 @@
           </tr></thead>
           <tbody>
           ${top.map(c => `<tr>
-            <td class="strong">${c.name}</td>
-            <td class="muted">${c.salesperson}</td>
+            <td class="strong">${D.esc(c.name)}</td>
+            <td class="muted">${D.esc(c.salesperson)}</td>
             <td class="muted">${D.govLabel(D.govOf(c.city).key)}</td>
-            <td class="muted">${c.city || "—"}</td>
+            <td class="muted">${D.esc(c.city || "—")}</td>
             <td class="amt">${D.fmtMoney(c.receivable)}</td>
             <td class="amt">${c.overdue > 0 ? `<span class="danger">${D.fmtMoney(c.overdue)}</span>` : `<span class="muted">0</span>`}</td>
           </tr>`).join("")}

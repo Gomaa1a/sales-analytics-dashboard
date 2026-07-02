@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Cities & Governorates</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=20" />
+  <link rel="stylesheet" href="assets/css/style.css?v=21" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗺️</text></svg>" />
 </head>
 <body>
@@ -14,6 +14,9 @@
       <h1 id="pgTitle"></h1>
       <p id="pgSub"></p>
     </div>
+
+    <p id="basisNote" class="muted" style="margin:-4px 2px 10px;font-size:12px;line-height:1.6"></p>
+    <div id="unmappedBanner" style="display:none"></div>
 
     <div class="filters">
       <label class="fb-field"><span id="fromLbl"></span><input id="fFrom" class="fb-date" type="date"></label>
@@ -44,8 +47,8 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=20"></script>
-  <script src="assets/js/common.js?v=20"></script>
+  <script src="assets/js/config.js?v=21"></script>
+  <script src="assets/js/common.js?v=21"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -59,6 +62,7 @@
     document.getElementById("toLbl").textContent = D.t("f_to");
     document.getElementById("q").placeholder = D.t("search_ph");
     document.getElementById("clr").textContent = D.t("f_clear");
+    document.getElementById("basisNote").textContent = D.t("region_basis");
 
     const PALETTE = ["#2563eb","#7c3aed","#16a34a","#d97706","#dc2626","#0891b2","#db2777","#65a30d","#9333ea","#0d9488","#ea580c","#4f46e5"];
     const isConf = o => o.state === "sale" || o.state === "done";
@@ -131,6 +135,21 @@
       const totalVal = govs.reduce((s, x) => s + x.value, 0) || 1;
       $("cnt").textContent = `${D.fmtNum(govs.length)} ${D.t("govs_title")} · ${D.fmtNum(cities.length)} ${D.t("cities_title")}`;
 
+      // Surface how much value/how many orders fall into "Unknown" so unmapped
+      // cities are visible instead of silently swallowed (CEO trust concern).
+      const unk = gmap["unknown"];
+      const banner = $("unmappedBanner");
+      if (unk && unk.value > 0) {
+        const pct = Math.round(unk.value / totalVal * 100);
+        banner.style.display = "";
+        banner.innerHTML =
+          `<div class="err" style="background:#fef3c7;color:#92400e;border:1px solid #fde68a;border-radius:10px;padding:10px 14px;margin:0 2px 12px;font-size:13px">` +
+          `⚠️ <b>${D.t("unmapped")}:</b> ${D.fmtNum(unk.orders)} ${D.t("orders")} · ${D.fmtMoney(unk.value)} (${pct}%). ${D.t("unmapped_note")}</div>`;
+      } else {
+        banner.style.display = "none";
+        banner.innerHTML = "";
+      }
+
       // governorate chart
       const ctx = $("govChart");
       if (chart) chart.destroy();
@@ -167,7 +186,7 @@
           <thead><tr><th>${D.t("region")}</th><th>${D.t("col_gov")}</th><th>${D.t("orders")}</th><th>${D.t("col_amount")}</th><th>${D.t("share")}</th></tr></thead>
           <tbody>
           ${cityList.map(r => `<tr>
-            <td class="strong">${r.city}</td>
+            <td class="strong">${D.esc(r.city)}</td>
             <td class="muted">${r.govLabel}</td>
             <td>${D.fmtNum(r.orders)}</td>
             <td class="amt">${D.fmtMoney(r.value)}</td>

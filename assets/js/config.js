@@ -38,9 +38,13 @@ window.DASH_CONFIG = {
   // ---- Executive targets (used by the Overview / Executive summary band) ----
   // Set these to the company's real goals. They drive the "vs target",
   // attainment %, and pace-to-target figures. Pure presentation config — no
-  // sensitive data. Set MONTHLY_REVENUE_TARGET to 0 to hide the target bar.
+  // sensitive data.
+  // ⚠️ IMPORTANT: MONTHLY_REVENUE_TARGET below is a PLACEHOLDER. Until the real
+  // figure is set, the Overview's "% of target" and "on pace for" numbers are
+  // meaningless. Set the real monthly goal, OR set it to 0 to HIDE the target
+  // bar entirely (the code already falls back to showing order count instead).
   TARGETS: {
-    MONTHLY_REVENUE_TARGET: 900000000,  // IQD confirmed-sales goal for the month (PLACEHOLDER — set the real figure)
+    MONTHLY_REVENUE_TARGET: 900000000,  // IQD confirmed-sales goal for the month (PLACEHOLDER — set the real figure, or 0 to hide)
     COLLECTION_RATE_TARGET: 70        // target for collected ÷ sales (%)
   }
 };

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Sales Command Center</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=20" />
+  <link rel="stylesheet" href="assets/css/style.css?v=21" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>" />
 </head>
 <body>
@@ -60,8 +60,8 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=20"></script>
-  <script src="assets/js/common.js?v=20"></script>
+  <script src="assets/js/config.js?v=21"></script>
+  <script src="assets/js/common.js?v=21"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -206,7 +206,7 @@
       document.getElementById("execMini").innerHTML =
         mini(D.t("conversion"), convPct + "%", `${D.fmtNum(rConf.length)} ${D.t("ov_confirmed")} · ${D.fmtNum(rQuotes.length)} ${D.t("kpi_quotes")}`) +
         mini(D.t("kpi_avg"), D.fmtMoney(aov), `${D.fmtNum(customers)} ${D.t("ov_customers")}`) +
-        mini(D.t("ex_top_rep"), topRep ? topRep[0] : "—", topRep ? D.fmtMoney(topRep[1]) : "&nbsp;") +
+        mini(D.t("ex_top_rep"), topRep ? D.esc(topRep[0]) : "—", topRep ? D.fmtMoney(topRep[1]) : "&nbsp;") +
         mini(D.t("ex_top_gov"), topGov ? topGov[0] : "—", topGov ? `${govShare}% ${D.t("share")}` : "&nbsp;");
 
       // ----- value at risk (critical alerts) -----

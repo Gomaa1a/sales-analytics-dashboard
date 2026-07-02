@@ -1,6 +1,6 @@
 /* ============================================================
    Order drill-down modal — opened by clicking any order ID.
-   Calls n8n /dash-order?id=<id>
+   Reads a single order from Supabase via DASH.api("order", { id }).
    ============================================================ */
 (function () {
   const D = window.DASH;
@@ -60,15 +60,15 @@
 
     const reasons = (risk.reasons && risk.reasons.length)
       ? `<ul class="risk-list">${risk.reasons.map(r =>
-          `<li class="r-${r.severity}">${r.severity === "critical" ? "🔴" : "🟡"} ${D.isAR() ? r.ar : r.en}</li>`).join("")}</ul>`
+          `<li class="r-${D.esc(r.severity)}">${r.severity === "critical" ? "🔴" : "🟡"} ${D.esc(D.isAR() ? r.ar : r.en)}</li>`).join("")}</ul>`
       : `<div class="ok-msg">${D.t("no_risk")}</div>`;
 
     const orderGrid = `
       <div class="kv-grid">
-        ${row(D.t("col_customer"), o.partner_name || "—")}
-        ${row(D.t("col_rep"), o.salesperson || "—")}
+        ${row(D.t("col_customer"), D.esc(o.partner_name || "—"))}
+        ${row(D.t("col_rep"), D.esc(o.salesperson || "—"))}
         ${row(D.t("f_state"), D.stateLabel(o.state))}
-        ${row(D.t("f_type"), o.type_name || "—")}
+        ${row(D.t("f_type"), D.esc(o.type_name || "—"))}
         ${row(D.t("f_date"), D.fmtDate(o.date_order))}
         ${row(D.t("f_qty"), D.fmtNum(o.total_quantity))}
         ${row(D.t("f_products"), D.fmtNum(o.total_product))}
@@ -89,7 +89,7 @@
         ${row(D.t("f_trust"), D.trustLabel(c.trust))}
         ${row(D.t("f_rank"), D.fmtNum(c.customer_rank))}
         ${row(D.t("f_invoiced"), D.fmtMoneyFull(c.total_invoiced))}
-        ${row(D.t("f_payment"), c.payment_method || "—")}
+        ${row(D.t("f_payment"), D.esc(c.payment_method || "—"))}
       </div>` : `<div class="muted">—</div>`;
 
     const showReview = risk.level === "critical" || risk.level === "warning";
@@ -103,8 +103,8 @@
     body.innerHTML = `
       <div class="modal-hero">
         <div>
-          <div class="mh-ref">${o.name || ("#" + id)}</div>
-          <div class="mh-name">${o.partner_name || ""}</div>
+          <div class="mh-ref">${D.esc(o.name || ("#" + id))}</div>
+          <div class="mh-name">${D.esc(o.partner_name || "")}</div>
         </div>
         <div class="mh-right">
           ${badge}
@@ -124,7 +124,7 @@
           (body.querySelector("#ackNote").value || "").trim());
         ackBtn.textContent = "✓ " + D.t("reviewed_ok");
         ackBtn.classList.add("done");
-        D.toast(`<b>✓ ${D.t("reviewed_ok")}</b>${o.name || ("#" + id)}`, "info");
+        D.toast(`<b>✓ ${D.t("reviewed_ok")}</b>${D.esc(o.name || ("#" + id))}`, "info");
       } catch (e) { ackBtn.disabled = false; D.toast(D.t("error_load"), "warning"); }
     });
   }

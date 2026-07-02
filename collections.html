@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Daily Collections</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=20" />
+  <link rel="stylesheet" href="assets/css/style.css?v=21" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💵</text></svg>" />
 </head>
 <body>
@@ -32,8 +32,8 @@
     <div class="foot">Dabboos Sales Command Center · Odoo → n8n → Supabase</div>
   </main>
 
-  <script src="assets/js/config.js?v=20"></script>
-  <script src="assets/js/common.js?v=20"></script>
+  <script src="assets/js/config.js?v=21"></script>
+  <script src="assets/js/common.js?v=21"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -139,7 +139,7 @@
           </tr></thead>
           <tbody>
           ${repList.map(r => `<tr>
-            <td class="strong">${r.salesperson}</td>
+            <td class="strong">${D.esc(r.salesperson)}</td>
             <td class="amt">${D.fmtMoney(r.today)}</td>
             <td class="amt"><b>${D.fmtMoney(r.mtd)}</b></td>
             <td class="amt muted">${D.fmtMoney(r.last)}</td>
@@ -171,7 +171,7 @@
           </tr></thead>
           <tbody>
           ${reps.map(r => `<tr>
-            <td class="strong">${r.salesperson}</td>
+            <td class="strong">${D.esc(r.salesperson)}</td>
             ${days.map(d => { const c = (r.daily && r.daily[d]) || { total: 0, pending: 0 }; return `<td class="cell${d === grid.today ? " today" : ""}">${c.total ? D.fmtMoney(c.total) : "—"}${c.pending ? `<div class="c-pend">${D.fmtMoney(c.pending)} ${D.t("coll_pending")}</div>` : ""}</td>`; }).join("")}
             <td class="cell strong">${D.fmtMoney(r.total)}</td>
           </tr>`).join("")}
