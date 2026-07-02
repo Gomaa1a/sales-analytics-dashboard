@@ -1,0 +1,93 @@
+# Known issues & open risks
+
+Status legend: ✅ fixed · 🟡 mitigated (real fix elsewhere) · 🔴 open (needs you)
+
+Ordered by business impact. Items 1–4 are what the CEO/manager can see; 5–9 are
+engineering risks.
+
+---
+
+## 1. 🟡 Governorate "Unknown / غير محدد" bucket
+**Symptom (manager, 2026-07):** regions numbers look wrong and there's a mystery
+"غير محدد" bucket even though all governorates are known.
+
+**Cause:** the governorate is *guessed in the browser* from the free-text `city`
+field via a hardcoded dictionary. Any spelling/prefix/typo the dictionary
+doesn't know falls into "Unknown."
+
+**Done in this pass:**
+- Rewrote `normCity()` + `govOf()` to normalize Arabic (diacritics, alef/ya/
+  hamza/ta-marbuta, **Persian letters**), strip prefixes (`محافظة`, `حي`, …),
+  match governorate names directly, and do token matching inside compound
+  strings. 13 unit cases pass.
+- Regions page now shows an **"Unmapped cities" banner** with the count/value/%
+  in Unknown, so it's visible instead of silent.
+
+**Real fix (backend, not done here):** sync a real governorate from Odoo
+(`res.partner.state_id` or delivery address) into `dashboard_orders`, and use the
+dictionary only as a fallback. This removes the guessing entirely.
+
+## 2. 🔴 Security model depends on unverified RLS
+`config.js` says the anon key is safe "because tables are read-only via RLS (see
+`supabase/schema.sql`)" — **but that schema file does not exist in the repo.**
+The entire security posture rests on policies that aren't captured anywhere.
+
+**Action (you, in Supabase dashboard):**
+- Confirm `anon` has **SELECT-only** on `dashboard_orders`, `dashboard_payments`,
+  `dashboard_snapshots`.
+- Confirm `alert_acks` allows `anon` **INSERT** but not UPDATE/DELETE, and
+  doesn't expose sensitive columns on SELECT.
+- Confirm **no other table** is exposed to `anon`.
+- Then commit the policies as `supabase/schema.sql` so the model is reproducible.
+
+## 3. 🔴 No authentication in front of financial data
+The dashboard serves sales, receivables, credit limits, and per-customer debt
+with only the public anon key — anyone with the URL sees everything. Put it
+behind an access gate (Cloudflare Access, Netlify password, VPN, etc.).
+
+## 4. 🟡 "606 orders" — possible duplicate sync rows
+A count that looks impossibly high is usually duplicate rows in
+`dashboard_orders` (n8n appending instead of upserting).
+
+**Done in this pass:** loaders now **de-duplicate by `order_id` / `payment_id`**
+client-side, so the UI counts each order once even if the table has duplicates.
+
+**Real fix (backend):** make the n8n sync **upsert on the primary key** so
+duplicates never land in the table. Verify with
+`select count(*), count(distinct order_id) from dashboard_orders;`.
+
+## 5. 🔴 Full-window polling re-downloads everything every 60s
+`sbGetAll()` pulls the entire orders + payments window on every poll, on every
+page, in every open tab — no delta, no cache. Fine now; costly as data grows.
+Consider incremental fetch (`create_date > lastSeen`) or moving heavy pages onto
+server-side snapshots (the `dashboard_snapshots` pattern already exists).
+
+## 6. ✅ Stored XSS via unescaped DB strings (FIXED)
+DB strings (esp. the anonymously-written alert `note`) were rendered via
+`innerHTML` with no escaping — a stored-XSS hole. **Fixed:** added `D.esc()` and
+wrapped every DB-derived value across all pages and the order modal. Verified
+`esc('<img onerror=x>')` is neutralized in-browser.
+
+## 7. 🔴 Chart.js loaded from CDN without integrity hash
+Four pages load `cdn.jsdelivr.net/npm/chart.js@4.4.1` with no SRI and no
+fallback. Pin with `integrity=`/`crossorigin`, or vendor it into `assets/`.
+(Left as-is here to avoid shipping a wrong hash that would break rendering —
+compute the real sha384 first, or self-host.)
+
+## 8. ✅ Stale "n8n" references (FIXED)
+Error text and comments referenced a non-existent `N8N_BASE`; the app reads
+Supabase directly. **Fixed** in `common.js` (error messages), `config.js`, and
+`order-modal.js` (header comment).
+
+## 9. 🔴 Placeholder revenue target shown as real
+`MONTHLY_REVENUE_TARGET = 900,000,000` is a placeholder but the Overview shows
+"% of target" / "on pace" as if real. Set the true figure, or `0` to hide the
+target band. (Comment in `config.js` now warns about this.)
+
+## Minor
+- Manual `?v=NN` cache-busting across 6 files is easy to desync — automate it.
+- No retry/backoff: a transient fetch failure blanks state and shows an error
+  until the next poll. Consider keeping last-good data + backoff.
+- Rep identity: some views key on `user_id`, the filter matches on `salesperson`
+  name — a renamed/duplicate-named rep can split or merge.
+- No README/LICENSE historically; README + docs added in this pass.

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Salespeople</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=20" />
+  <link rel="stylesheet" href="assets/css/style.css?v=21" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>" />
 </head>
 <body>
@@ -29,8 +29,8 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=20"></script>
-  <script src="assets/js/common.js?v=20"></script>
+  <script src="assets/js/config.js?v=21"></script>
+  <script src="assets/js/common.js?v=21"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -123,7 +123,7 @@
         kpi("k-vio", D.t("sp_reps"), D.fmtNum(reps.length), `${from} → ${to}`) +
         kpi("k-grn", D.t("ov_confirmed"), D.fmtNum(rangeOrders), `${D.t("kpi_value")}: <b>${D.fmtMoney(rangeValue)}</b>`) +
         kpi("", D.t("kpi_value"), D.fmtMoney(rangeValue), "&nbsp;") +
-        kpi("", D.t("col_rep"), top ? top.salesperson : "—", top ? D.fmtMoney(top.rangeValue) : "&nbsp;");
+        kpi("", D.t("col_rep"), top ? D.esc(top.salesperson) : "—", top ? D.fmtMoney(top.rangeValue) : "&nbsp;");
 
       // this-week vs last-week comparison (top 12 by range)
       const t12 = reps.slice(0, 12);
@@ -142,7 +142,7 @@
       document.getElementById("repCards").innerHTML = reps.length ? reps.map((r, i) => `
         <div class="rep-card">
           <div class="rep-head">
-            <div class="rep-name">${r.salesperson}</div>
+            <div class="rep-name">${D.esc(r.salesperson)}</div>
             <div class="rep-tags">
               <span class="tag-lbl">${D.t("wow")}</span>${tag(pctOf(r.thisWeek, r.lastWeek))}
               <span class="tag-lbl">${D.t("mom")}</span>${tag(pctOf(r.thisMonth, r.lastMonth))}
