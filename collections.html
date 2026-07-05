@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Daily Collections</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=22" />
+  <link rel="stylesheet" href="assets/css/style.css?v=23" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💵</text></svg>" />
 </head>
 <body>
@@ -32,8 +32,8 @@
     <div class="foot">Dabboos Sales Command Center · Odoo → n8n → Supabase</div>
   </main>
 
-  <script src="assets/js/config.js?v=22"></script>
-  <script src="assets/js/common.js?v=22"></script>
+  <script src="assets/js/config.js?v=23"></script>
+  <script src="assets/js/common.js?v=23"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -82,7 +82,7 @@
       try {
         [payments, orders] = await Promise.all([
           D.loadPayments({ from, to }),
-          D.loadOrders({ from, to, dateField: "create_date", select: "order_id,salesperson,user_id,state,amount_total,create_date,partner_name" })
+          D.loadOrders({ from, to, dateField: "date_order", select: "order_id,salesperson,user_id,state,amount_total,create_date,date_order,partner_name" })
         ]);
         loadedFrom = from; loadedTo = to;
         D.setUpdated(new Date().toISOString());
@@ -105,7 +105,7 @@
       const todayTot = sumP(pays.filter(p => String(p.date).slice(0, 10) === today));
       const tot14 = sumP(pays.filter(p => inRange(String(p.date).slice(0, 10), d14, today)));
       const periodTot = sumP(pays.filter(p => inRange(String(p.date).slice(0, 10), from, to)));
-      const periodSales = ords.filter(o => inRange(String(o.create_date).slice(0, 10), from, to)).reduce((s, o) => s + num(o.amount_total), 0);
+      const periodSales = ords.filter(o => inRange(String(o.date_order || o.create_date).slice(0, 10), from, to)).reduce((s, o) => s + num(o.amount_total), 0);
       const vsSales = periodSales > 0 ? Math.round(periodTot / periodSales * 100) : null;
       document.getElementById("kpis").innerHTML =
         kpi("k-grn", D.t("coll_today"), D.fmtMoney(todayTot), today) +
@@ -122,7 +122,7 @@
         if (d.slice(0, 7) === thisMonth) r.mtd += num(p.amount);
         if (d.slice(0, 7) === lastMonth) r.last += num(p.amount);
       });
-      ords.forEach(o => { const d = String(o.create_date).slice(0, 10); if (d.slice(0, 7) === thisMonth) { const k = repKey(o); const r = ensure(k, o.salesperson || "—", o.user_id); r.salesMtd += num(o.amount_total); } });
+      ords.forEach(o => { const d = String(o.date_order || o.create_date).slice(0, 10); if (d.slice(0, 7) === thisMonth) { const k = repKey(o); const r = ensure(k, o.salesperson || "—", o.user_id); r.salesMtd += num(o.amount_total); } });
       const repList = Object.values(reps).map(r => ({
         ...r,
         mom: r.last > 0 ? Math.round((r.mtd - r.last) / r.last * 100) : (r.mtd > 0 ? 100 : 0),

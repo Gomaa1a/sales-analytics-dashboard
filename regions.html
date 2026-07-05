@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Cities & Governorates</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=22" />
+  <link rel="stylesheet" href="assets/css/style.css?v=23" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗺️</text></svg>" />
 </head>
 <body>
@@ -47,8 +47,8 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=22"></script>
-  <script src="assets/js/common.js?v=22"></script>
+  <script src="assets/js/config.js?v=23"></script>
+  <script src="assets/js/common.js?v=23"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -93,8 +93,8 @@
 
     async function loadWindow(from, to) {
       try {
-        const rows = await D.loadOrders({ from, to, dateField: "create_date",
-          select: "order_id,city,state,amount_total,create_date" });
+        const rows = await D.loadOrders({ from, to, dateField: "date_order",
+          select: "order_id,city,state,amount_total,create_date,date_order" });
         loadedFrom = from; loadedTo = to;
         // aggregate confirmed orders by city, tagging each with its governorate
         const m = {};

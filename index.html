@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Sales Command Center</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=22" />
+  <link rel="stylesheet" href="assets/css/style.css?v=23" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>" />
 </head>
 <body>
@@ -65,8 +65,8 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=22"></script>
-  <script src="assets/js/common.js?v=22"></script>
+  <script src="assets/js/config.js?v=23"></script>
+  <script src="assets/js/common.js?v=23"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -83,7 +83,7 @@
     const isConf = o => o.state === "sale" || o.state === "done";
     const val = o => Number(o.amount_total) || 0;
     const num = n => Number(n) || 0;
-    const dayOf = o => String(o.create_date || o.date_order || "").slice(0, 10);
+    const dayOf = o => String(o.date_order || o.create_date || "").slice(0, 10);
     const inMonth = (o, ym) => dayOf(o).slice(0, 7) === ym;
     const TARGETS = (D.cfg.TARGETS || {});
     const TARGET = num(TARGETS.MONTHLY_REVENUE_TARGET);
@@ -121,7 +121,7 @@
     async function loadWindow(from, to) {
       try {
         [allRows, payments] = await Promise.all([
-          D.loadOrders({ from, to, dateField: "create_date",
+          D.loadOrders({ from, to, dateField: "date_order",
             select: "order_id,order_name,partner_name,salesperson,user_id,city,state,amount_total,create_date,date_order" }),
           D.loadPayments({ from, to })
         ]);

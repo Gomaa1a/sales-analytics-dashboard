@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-07-05 — Match Odoo: count sales by order date (date_order)
+
+- All order date-bucketing (Overview, Regions, Collections period sales,
+  Salespeople) switched from `create_date` to `date_order` — the same basis as
+  Odoo's Sales screens, so "today's orders" now matches Odoo (the 117 vs 148 gap).
+- Pairs with the Site_Orders_Sync workflow v2 (fetch by `write_date` = anything
+  created/confirmed/cancelled/edited today; snapshots bucketed by `date_order`).
+  Stale rows (orders confirmed or cancelled days after creation) now self-heal.
+- Cache-bust v=23.
+
 ## 2026-07-05 — Executive overview redesign (audit-driven)
 
 ### Changed — Overview (`index.html`)
