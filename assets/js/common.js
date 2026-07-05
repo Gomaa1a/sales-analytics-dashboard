@@ -44,6 +44,16 @@
       ov_customers: "عدد العملاء",
       ov_status_mix: "توزيع حالات الطلبات",
       no_alerts: "لا توجد تنبيهات حالياً ✅",
+      // overview: today strip + action tables
+      ov_today_sales: "مبيعات اليوم (مؤكدة)",
+      ov_pending_cash: "نقد قيد التحصيل (بذمة المندوبين)",
+      ov_cancelled: "طلبات ملغاة هذا الشهر",
+      ov_orders_month: "طلبات مؤكدة هذا الشهر",
+      ov_top_debtors: "أكبر المتأخرين — عملاء للمتابعة اليوم",
+      ov_leaderboard: "المندوبون — مبيعات مقابل تحصيل (هذا الشهر)",
+      col_collected: "المُحصَّل",
+      col_sales: "المبيعات",
+      payments_count: "دفعة",
       // executive summary band (merged into the overview)
       exec_title: "النظرة التنفيذية",
       ex_revenue: "المبيعات المؤكدة — هذا الشهر",
@@ -203,6 +213,16 @@
       ov_customers: "Customers",
       ov_status_mix: "Order status mix",
       no_alerts: "No alerts right now ✅",
+      // overview: today strip + action tables
+      ov_today_sales: "Sales today (confirmed)",
+      ov_pending_cash: "Cash in process (held by reps)",
+      ov_cancelled: "Cancelled this month",
+      ov_orders_month: "Confirmed orders this month",
+      ov_top_debtors: "Top overdue customers — follow up today",
+      ov_leaderboard: "Reps — sales vs collected (this month)",
+      col_collected: "Collected",
+      col_sales: "Sales",
+      payments_count: "payments",
       // executive summary band (merged into the overview)
       exec_title: "Executive summary",
       ex_revenue: "Confirmed sales — this month",
@@ -710,7 +730,29 @@
     // Maysan
     "العمارة": "maysan", "ميسان": "maysan", "المجر": "maysan", "قلعة صالح": "maysan",
     // Sulaymaniyah
-    "السليمانية": "sulaymaniyah", "السليمانيه": "sulaymaniyah"
+    "السليمانية": "sulaymaniyah", "السليمانيه": "sulaymaniyah",
+    // ---- 2026-07 audit additions (high-confidence districts seen in live data) ----
+    // Baghdad districts
+    "اليوسفية": "baghdad", "الطارمية": "baghdad", "النهروان": "baghdad", "اليرموك": "baghdad",
+    "الشعلة": "baghdad", "السيدية": "baghdad", "بسماية": "baghdad", "مدينة الصدر": "baghdad",
+    "الوزيرية": "baghdad", "الحرية": "baghdad", "الشعب": "baghdad", "الصالحية": "baghdad",
+    "العطيفية": "baghdad", "البياع": "baghdad", "الاعظمية": "baghdad", "الجهاد": "baghdad",
+    // Anbar
+    "عانة": "anbar", "الرطبة": "anbar",
+    // Karbala (طويريج = local name of الهندية)
+    "طويريج": "karbala",
+    // Basra districts / towns
+    "الهارثة": "basra", "القبلة": "basra", "ام قصر": "basra", "سفوان": "basra",
+    "الفاو": "basra", "التنومة": "basra",
+    // Nineveh districts / towns
+    "القيارة": "nineveh", "بعشيقة": "nineveh", "برطلة": "nineveh", "تلعفر": "nineveh",
+    "سنجار": "nineveh", "تلكيف": "nineveh",
+    // Babil
+    "الاسكندرية": "babil",
+    // Dhi Qar
+    "البطحة": "dhiqar",
+    // Maysan
+    "علي الغربي": "maysan"
   };
   // Normalize a messy free-text Arabic city string so more values match:
   // strip diacritics/tatweel, unify alef/ya/hamza/ta-marbuta spellings, collapse
@@ -808,7 +850,9 @@
   async function loadPayments(o) {
     o = o || {};
     const sel = o.select || "payment_id,date,amount,state,salesperson,user_id,partner_name,partner_id,journal";
-    let q = `dashboard_payments?select=${sel}&order=date.desc`;
+    // Canceled payments are not money — excluding them here keeps every page's
+    // KPIs consistent with the rep_collections snapshot (which also skips them).
+    let q = `dashboard_payments?select=${sel}&order=date.desc&state=neq.canceled`;
     if (o.from) q += `&date=gte.${o.from}`;
     if (o.to)   q += `&date=lt.${nextDay(o.to)}`;
     const rows = dedupeBy(await sbGetAll(q), "payment_id");

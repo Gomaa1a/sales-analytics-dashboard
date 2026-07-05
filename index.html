@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Sales Command Center</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=21" />
+  <link rel="stylesheet" href="assets/css/style.css?v=22" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>" />
 </head>
 <body>
@@ -17,7 +17,10 @@
 
     <div class="filters" id="fbHost"></div>
 
-    <!-- Executive summary band (merged into the overview) -->
+    <!-- Row 1 — TODAY: how is the day going? (always anchored to today) -->
+    <div id="todayKpis" class="kpi-grid"></div>
+
+    <!-- Row 2 — THE MONTH: sales vs target · cash · overdue · uninvoiced -->
     <section class="exec">
       <div class="exec-heads" id="execHeads"></div>
       <div class="exec-mini" id="execMini"></div>
@@ -34,25 +37,27 @@
       </div>
     </section>
 
+    <!-- Row 3 — NAMES: who to call, who is performing -->
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-head"><h2 id="debtorsTitle"></h2></div>
+        <div class="panel-body" style="padding:0"><div id="debtorsBox"></div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h2 id="leaderTitle"></h2></div>
+        <div class="panel-body" style="padding:0"><div id="leaderBox"></div></div>
+      </div>
+    </div>
+
+    <!-- Row 4 — RHYTHM: daily pulse + customer dependency -->
     <div class="grid-2">
       <div class="panel">
         <div class="panel-head"><h2 id="dayTitle"></h2></div>
         <div class="panel-body"><div class="chart-box"><canvas id="dayChart"></canvas></div></div>
       </div>
       <div class="panel">
-        <div class="panel-head"><h2 id="statusTitle"></h2></div>
-        <div class="panel-body"><div class="chart-box"><canvas id="statusChart"></canvas></div></div>
-      </div>
-    </div>
-
-    <div class="grid-2">
-      <div class="panel">
         <div class="panel-head"><h2 id="custTitle"></h2></div>
         <div class="panel-body"><div class="chart-box"><canvas id="custChart"></canvas></div></div>
-      </div>
-      <div class="panel">
-        <div class="panel-head"><h2 id="govTitle"></h2></div>
-        <div class="panel-body"><div class="chart-box"><canvas id="govChart"></canvas></div></div>
       </div>
     </div>
 
@@ -60,8 +65,8 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=21"></script>
-  <script src="assets/js/common.js?v=21"></script>
+  <script src="assets/js/config.js?v=22"></script>
+  <script src="assets/js/common.js?v=22"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -69,14 +74,13 @@
     document.getElementById("pgTitle").textContent = D.t("brand");
     document.getElementById("pgSub").textContent = D.t("ov_sub");
     document.getElementById("dayTitle").textContent = D.t("ov_orders_day");
-    document.getElementById("statusTitle").textContent = D.t("ov_status_mix");
     document.getElementById("custTitle").textContent = D.t("top_customers");
-    document.getElementById("govTitle").textContent = D.t("ov_top_govs");
+    document.getElementById("debtorsTitle").textContent = D.t("ov_top_debtors");
+    document.getElementById("leaderTitle").textContent = D.t("ov_leaderboard");
     document.getElementById("storyLbl").textContent = D.t("ex_story");
     document.getElementById("varLbl").textContent = D.t("ex_var");
 
     const isConf = o => o.state === "sale" || o.state === "done";
-    const isQuote = o => o.state === "draft" || o.state === "sent";
     const val = o => Number(o.amount_total) || 0;
     const num = n => Number(n) || 0;
     const dayOf = o => String(o.create_date || o.date_order || "").slice(0, 10);
@@ -84,8 +88,8 @@
     const TARGETS = (D.cfg.TARGETS || {});
     const TARGET = num(TARGETS.MONTHLY_REVENUE_TARGET);
 
-    let dayChart = null, statusChart = null, custChart = null, govChart = null;
-    let allRows = [], payments = [], debtRows = [], alerts = [];
+    let dayChart = null, custChart = null;
+    let allRows = [], payments = [], debtRows = [], alerts = [], collSnap = null;
     let loadedFrom = null, loadedTo = null;
 
     // Baghdad calendar anchors
@@ -128,16 +132,19 @@
     }
 
     async function loadSnapshots() {
-      // live overdue (rep_debt) + value-at-risk (alerts) — not date-windowed
+      // live overdue (rep_debt) + value-at-risk (alerts) + uninvoiced (collections) — not date-windowed
       try {
         const snap = await D.api("rep_debt");
         debtRows = [];
         (snap.reps || []).forEach(r => (r.customers || []).forEach(c =>
-          debtRows.push({ name: c.name, receivable: num(c.receivable), overdue: num(c.overdue), salesperson: r.salesperson })));
+          debtRows.push({ name: c.name, city: c.city, receivable: num(c.receivable), overdue: num(c.overdue), salesperson: r.salesperson })));
       } catch (e) { debtRows = []; }
       try { const a = await D.api("alerts"); alerts = a.alerts || []; } catch (e) { alerts = []; }
+      try { collSnap = await D.api("collections"); } catch (e) { collSnap = null; }
     }
 
+    const kpi = (cls, label, n, sub) =>
+      `<div class="kpi ${cls}"><div class="kpi-l">${label}</div><div class="kpi-n">${n}</div><div class="kpi-sub">${sub || "&nbsp;"}</div></div>`;
     const card = (lbl, n, extra) =>
       `<div class="exec-card"><div class="ex-l">${lbl}</div><div class="exec-row"><div class="exec-n">${n}</div>${extra || ""}</div>`;
     const mini = (lbl, v, d) =>
@@ -151,12 +158,12 @@
       // rep + customer narrowing applies to everything ("search changes all data")
       const matchRC = o => fb.match(o, { rep: "salesperson", cust: "partner_name" });
 
-      // ----- filter-range slice (drives the secondary stats + charts) -----
+      // ----- filter-range slice (drives the minis + charts) -----
       const rangeRows = allRows.filter(o => { const d = dayOf(o); return d >= from && d <= to && matchRC(o); });
-      const rConf = rangeRows.filter(isConf), rQuotes = rangeRows.filter(isQuote);
+      const rConf = rangeRows.filter(isConf);
+      const rCancel = rangeRows.filter(o => o.state === "cancel");
       const rConfVal = rConf.reduce((s, o) => s + val(o), 0);
-      const aov = rConf.length ? Math.round(rConfVal / rConf.length) : 0;
-      const convPct = (rConf.length + rQuotes.length) ? Math.round(rConf.length / (rConf.length + rQuotes.length) * 100) : 0;
+      const rCancelVal = rCancel.reduce((s, o) => s + val(o), 0);
       const customers = new Set(rConf.map(o => o.partner_name).filter(Boolean)).size;
       fb.setCount(rangeRows.length);
 
@@ -173,13 +180,24 @@
       const cashMonth = paysRC.filter(p => String(p.date).slice(0, 7) === thisMonth).reduce((s, p) => s + num(p.amount), 0);
       const vsSales = revMonth > 0 ? Math.round(cashMonth / revMonth * 100) : null;
 
-      // overdue / receivable (respect rep + customer filter)
+      // ----- TODAY strip (always today, respects rep/customer filter) -----
+      const salesTodayRows = confAll.filter(o => dayOf(o) === today);
+      const salesToday = salesTodayRows.reduce((s, o) => s + val(o), 0);
+      const cashTodayRows = paysRC.filter(p => String(p.date).slice(0, 10) === today);
+      const cashToday = cashTodayRows.reduce((s, p) => s + num(p.amount), 0);
+      const pendRows = paysRC.filter(p => p.state === "in_process");
+      const pendCash = pendRows.reduce((s, p) => s + num(p.amount), 0);
+      document.getElementById("todayKpis").innerHTML =
+        kpi("", D.t("ov_today_sales"), D.fmtMoney(salesToday), `${D.fmtNum(salesTodayRows.length)} ${D.t("orders")} · ${today}`) +
+        kpi("k-grn", D.t("coll_today"), D.fmtMoney(cashToday), `${D.fmtNum(cashTodayRows.length)} ${D.t("payments_count")} · ${today}`) +
+        kpi("k-amb", D.t("ov_pending_cash"), D.fmtMoney(pendCash), `${D.fmtNum(pendRows.length)} ${D.t("payments_count")}`);
+
+      // ----- overdue / receivable (respect rep + customer filter) -----
       const debtRC = debtRows.filter(r => (!v.rep || r.salesperson === v.rep) && (!v.cust || String(r.name || "").toLowerCase().includes(v.cust)));
-      const receivable = debtRC.reduce((s, r) => s + r.receivable, 0);
       const overdue = debtRC.reduce((s, r) => s + r.overdue, 0);
-      const top10 = [...debtRC].sort((a, b) => b.overdue - a.overdue).slice(0, 10).reduce((s, r) => s + r.overdue, 0);
+      const byOver = [...debtRC].sort((a, b) => b.overdue - a.overdue);
+      const top10 = byOver.slice(0, 10).reduce((s, r) => s + r.overdue, 0);
       const conc = overdue > 0 ? Math.round(top10 / overdue * 100) : 0;
-      const dso = (receivable > 0 && revMonth > 0) ? Math.round(receivable / revMonth * 30) : null;
 
       // ----- hero cards -----
       const barCls = paceVs == null ? "" : (paceVs >= 100 ? "" : (paceVs >= 80 ? "warn" : "bad"));
@@ -191,22 +209,21 @@
       document.getElementById("execHeads").innerHTML =
         card(D.t("ex_revenue"), D.fmtMoney(revMonth), revLast > 0 ? deltaTag(momRev) : "") + targetBlock + `</div>` +
         card(D.t("ex_cash"), D.fmtMoney(cashMonth), "") +
-          `<div class="ex-sub" style="margin-top:9px">${D.t("coll_vs_sales")}: <b>${vsSales != null ? vsSales + "%" : "—"}</b>` +
-          `${dso != null ? ` · ${D.t("ex_dso")}: <b>${dso}</b>` : ""}</div></div>` +
+          `<div class="ex-sub" style="margin-top:9px">${D.t("coll_vs_sales")}: <b>${vsSales != null ? vsSales + "%" : "—"}</b></div></div>` +
         `<div class="exec-card"><div class="ex-l">${D.t("ex_overdue")}</div><div class="exec-row"><div class="exec-n" style="color:var(--red)">${D.fmtMoney(overdue)}</div></div>` +
-          `<div class="ex-sub" style="margin-top:9px">${D.t("ex_conc_sub")}: <b>${conc}%</b></div></div>`;
+          `<div class="ex-sub" style="margin-top:9px">${D.t("ex_conc_sub")}: <b>${conc}%</b></div></div>` +
+        `<div class="exec-card"><div class="ex-l">${D.t("uninvoiced")}</div><div class="exec-row"><div class="exec-n" style="color:var(--amb)">${collSnap ? D.fmtMoney(num(collSnap.uninvoiced_value)) : "—"}</div></div>` +
+          `<div class="ex-sub" style="margin-top:9px">${collSnap ? `${D.fmtNum(collSnap.uninvoiced_count)} ${D.t("orders")}` : "&nbsp;"}</div></div>`;
 
-      // ----- secondary mini stats (filter-range) -----
-      const repAgg = {}; rConf.forEach(o => { const n = o.salesperson || "—"; repAgg[n] = (repAgg[n] || 0) + val(o); });
-      const topRep = Object.entries(repAgg).sort((a, b) => b[1] - a[1])[0];
+      // ----- minis (filter-range) -----
       const govAgg = {}; let govTotal = 0; rConf.forEach(o => { const g = D.govLabel(D.govOf(o.city).key); govAgg[g] = (govAgg[g] || 0) + val(o); govTotal += val(o); });
       const topGov = Object.entries(govAgg).sort((a, b) => b[1] - a[1])[0];
       const govShare = (topGov && govTotal > 0) ? Math.round(topGov[1] / govTotal * 100) : 0;
 
       document.getElementById("execMini").innerHTML =
-        mini(D.t("conversion"), convPct + "%", `${D.fmtNum(rConf.length)} ${D.t("ov_confirmed")} · ${D.fmtNum(rQuotes.length)} ${D.t("kpi_quotes")}`) +
-        mini(D.t("kpi_avg"), D.fmtMoney(aov), `${D.fmtNum(customers)} ${D.t("ov_customers")}`) +
-        mini(D.t("ex_top_rep"), topRep ? D.esc(topRep[0]) : "—", topRep ? D.fmtMoney(topRep[1]) : "&nbsp;") +
+        mini(D.t("ov_confirmed"), D.fmtNum(rConf.length), D.fmtMoney(rConfVal)) +
+        mini(D.t("ov_customers"), D.fmtNum(customers), `${from} → ${to}`) +
+        mini(D.t("ov_cancelled"), D.fmtNum(rCancel.length), rCancel.length ? D.fmtMoney(rCancelVal) : "&nbsp;") +
         mini(D.t("ex_top_gov"), topGov ? topGov[0] : "—", topGov ? `${govShare}% ${D.t("share")}` : "&nbsp;");
 
       // ----- value at risk (critical alerts) -----
@@ -218,11 +235,56 @@
       // ----- narrative -----
       document.getElementById("storyText").innerHTML = buildStory({ revMonth, momRev, hasLast: revLast > 0, attain, pace, vsSales, overdue, conc, topGov, govShare });
 
+      // ----- action tables -----
+      renderDebtors(byOver.slice(0, 10));
+      renderLeaderboard(confAll, paysRC);
+
       // ----- charts (filter-range) -----
       drawByDay(rConf);
-      drawStatus(rangeRows);
       drawTopCustomers(rConf);
-      drawTopGovs(rConf);
+    }
+
+    function renderDebtors(top) {
+      const box = document.getElementById("debtorsBox");
+      if (!top.length) { box.innerHTML = `<div class="empty">${D.t("no_data")}</div>`; return; }
+      box.innerHTML = `
+        <table class="dt">
+          <thead><tr><th>${D.t("col_customer")}</th><th>${D.t("col_rep")}</th><th>${D.t("col_overdue")}</th><th>${D.t("col_debit")}</th></tr></thead>
+          <tbody>
+          ${top.map(r => `<tr>
+            <td class="strong">${D.esc(r.name)}</td>
+            <td class="muted">${D.esc(r.salesperson)}</td>
+            <td class="amt"><span class="danger">${D.fmtMoney(r.overdue)}</span></td>
+            <td class="amt muted">${D.fmtMoney(r.receivable)}</td>
+          </tr>`).join("")}
+          </tbody>
+        </table>`;
+    }
+
+    function renderLeaderboard(confAll, paysRC) {
+      const box = document.getElementById("leaderBox");
+      const m = {};
+      const ensure = n => (m[n] = m[n] || { rep: n, sales: 0, collected: 0 });
+      confAll.forEach(o => { if (inMonth(o, thisMonth)) ensure(o.salesperson || "—").sales += val(o); });
+      paysRC.forEach(p => { if (String(p.date).slice(0, 7) === thisMonth) ensure(p.salesperson || "—").collected += num(p.amount); });
+      const list = Object.values(m).filter(r => r.sales > 0 || r.collected > 0)
+        .sort((a, b) => (b.sales - a.sales) || (b.collected - a.collected)).slice(0, 10);
+      if (!list.length) { box.innerHTML = `<div class="empty">${D.t("no_data")}</div>`; return; }
+      box.innerHTML = `
+        <table class="dt">
+          <thead><tr><th>${D.t("col_rep")}</th><th>${D.t("col_sales")}</th><th>${D.t("col_collected")}</th><th>${D.t("coll_vs_sales")}</th></tr></thead>
+          <tbody>
+          ${list.map(r => {
+            const pct = r.sales > 0 ? Math.round(r.collected / r.sales * 100) : null;
+            const cls = pct == null ? "muted" : (pct >= 70 ? "ok" : (pct >= 40 ? "" : "danger"));
+            return `<tr>
+              <td class="strong">${D.esc(r.rep)}</td>
+              <td class="amt">${D.fmtMoney(r.sales)}</td>
+              <td class="amt">${D.fmtMoney(r.collected)}</td>
+              <td><span class="${cls}">${pct != null ? pct + "%" : "—"}</span></td>
+            </tr>`; }).join("")}
+          </tbody>
+        </table>`;
     }
 
     function buildStory(x) {
@@ -234,7 +296,7 @@
         if (x.attain != null) s += `، أي <b>${x.attain}%</b> من الهدف، والمتوقّع <b>${m(x.pace)}</b> بنهاية الشهر`;
         if (x.vsSales != null) s += `. التحصيل <b>${x.vsSales}%</b> من المبيعات`;
         if (x.overdue > 0) s += `، والمتأخرات <b>${m(x.overdue)}</b> يتركّز <b>${x.conc}%</b> منها في أكبر ١٠ عملاء`;
-        if (x.topGov) s += `. أعلى محافظة: <b>${x.topGov[0]}</b> (${x.govShare}%)`;
+        if (x.topGov) s += `. أعلى محافظة: <b>${D.esc(x.topGov[0])}</b> (${x.govShare}%)`;
         return s + ".";
       }
       let s = `Confirmed sales this month are <b>${m(x.revMonth)}</b>`;
@@ -242,7 +304,7 @@
       if (x.attain != null) s += `, i.e. <b>${x.attain}%</b> of target, on pace for <b>${m(x.pace)}</b> by month-end`;
       if (x.vsSales != null) s += `. Cash collected is <b>${x.vsSales}%</b> of sales`;
       if (x.overdue > 0) s += `, and overdue of <b>${m(x.overdue)}</b> is <b>${x.conc}%</b> concentrated in the top 10 customers`;
-      if (x.topGov) s += `. Top governorate: <b>${x.topGov[0]}</b> (${x.govShare}%)`;
+      if (x.topGov) s += `. Top governorate: <b>${D.esc(x.topGov[0])}</b> (${x.govShare}%)`;
       return s + ".";
     }
 
@@ -264,24 +326,6 @@
       });
     }
 
-    function drawStatus(rows) {
-      const order = ["draft", "sent", "sale", "done", "cancel"];
-      const color = { draft: "#94a3b8", sent: "#60a5fa", sale: "#16a34a", done: "#0891b2", cancel: "#dc2626" };
-      const counts = {}; order.forEach(s => counts[s] = 0);
-      rows.forEach(o => { if (counts[o.state] != null) counts[o.state]++; });
-      const present = order.filter(s => counts[s] > 0);
-      const ctx = document.getElementById("statusChart");
-      if (statusChart) statusChart.destroy();
-      statusChart = new Chart(ctx, {
-        type: "doughnut",
-        data: { labels: present.map(s => D.stateLabel(s)), datasets: [{
-          data: present.map(s => counts[s]), backgroundColor: present.map(s => color[s]), borderWidth: 2 }] },
-        options: { maintainAspectRatio: false, cutout: "55%",
-          plugins: { legend: { position: "bottom" }, tooltip: { callbacks: {
-            label: c => `${c.label}: ${D.fmtNum(c.parsed)} ${D.t("orders")}` } } } }
-      });
-    }
-
     function drawTopCustomers(conf) {
       const m = {};
       conf.forEach(o => { const n = o.partner_name || "—"; if (!m[n]) m[n] = { orders: 0, value: 0 }; m[n].orders++; m[n].value += val(o); });
@@ -292,24 +336,6 @@
         type: "bar",
         data: { labels: top.map(x => x.name), datasets: [{
           label: D.t("kpi_value"), data: top.map(x => x.value), backgroundColor: "#0ea5e9", borderRadius: 5, maxBarThickness: 20 }] },
-        options: { maintainAspectRatio: false, indexAxis: "y",
-          plugins: { legend: { display: false }, tooltip: { callbacks: {
-            label: c => `${D.fmtMoneyFull(c.parsed.x)} · ${D.fmtNum(top[c.dataIndex].orders)} ${D.t("orders")}` } } },
-          scales: { x: { beginAtZero: true, ticks: { callback: v => D.fmtMoney(v) } } } }
-      });
-    }
-
-    function drawTopGovs(conf) {
-      const m = {};
-      conf.forEach(o => { const g = D.govOf(o.city); if (!m[g.key]) m[g.key] = { label: D.govLabel(g.key), orders: 0, value: 0 }; m[g.key].orders++; m[g.key].value += val(o); });
-      const top = Object.values(m).sort((a, b) => b.value - a.value).slice(0, 10);
-      const PAL = ["#2563eb","#7c3aed","#16a34a","#d97706","#dc2626","#0891b2","#db2777","#65a30d","#9333ea","#0d9488"];
-      const ctx = document.getElementById("govChart");
-      if (govChart) govChart.destroy();
-      govChart = new Chart(ctx, {
-        type: "bar",
-        data: { labels: top.map(x => x.label), datasets: [{
-          label: D.t("kpi_value"), data: top.map(x => x.value), backgroundColor: top.map((_, i) => PAL[i % PAL.length]), borderRadius: 5, maxBarThickness: 24 }] },
         options: { maintainAspectRatio: false, indexAxis: "y",
           plugins: { legend: { display: false }, tooltip: { callbacks: {
             label: c => `${D.fmtMoneyFull(c.parsed.x)} · ${D.fmtNum(top[c.dataIndex].orders)} ${D.t("orders")}` } } },

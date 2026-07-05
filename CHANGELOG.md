@@ -1,5 +1,33 @@
 # Changelog
 
+## 2026-07-05 — Executive overview redesign (audit-driven)
+
+### Changed — Overview (`index.html`)
+- **New "Today" strip** (always anchored to today, respects rep/customer filters):
+  sales today, cash collected today, and cash in process (held by reps).
+- **4th hero card: "Confirmed, not invoiced"** (from the `collections` snapshot) —
+  ~263M IQD / 578 orders of sold-but-uninvoiced revenue is now impossible to miss.
+- **Two action tables replace two low-value charts:** Top-10 overdue debtors
+  (who to call today) and a rep leaderboard (sales vs collected MTD with a
+  color-coded collection ratio).
+- **Removed:** order-status doughnut (97% one state — told nothing), conversion %
+  mini (~18 quotations/month), avg-order-value mini, DSO approximation, and the
+  top-governorates chart (lives on the Regions page; the mini stat remains).
+- Minis are now: confirmed orders, customers, cancelled orders, top governorate.
+
+### Fixed — numbers
+- **`loadPayments()` now excludes `canceled` payments** (`state=neq.canceled`).
+  This closes the on-screen mismatch where Collections KPIs read 226,000 IQD
+  higher than the 14-day grid (the snapshot already skipped canceled rows).
+- **~30 new city→governorate dictionary entries** (Baghdad districts, Anbar,
+  Karbala, Basra, Nineveh towns…) verified against live order data — reduces
+  "Unknown" governorate orders further on top of the normalizer.
+- Added the missing `.ok` CSS class (green) used by ratio cells.
+
+### Notes
+- Asset cache-bust bumped to `?v=22`.
+- Hero band is now 4 columns (2×2 below 1280px).
+
 ## 2026-07-02 — Trust & security pass
 
 ### Fixed — numbers / trust (CEO-facing)

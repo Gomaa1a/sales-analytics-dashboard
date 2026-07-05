@@ -96,7 +96,8 @@ header.app {
 
 /* ---------- executive summary band (merged into the overview) ---------- */
 .exec { margin-bottom: 18px; }
-.exec-heads { display: grid; grid-template-columns: 1.5fr 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+.exec-heads { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+@media (max-width: 1280px) { .exec-heads { grid-template-columns: 1fr 1fr; } }
 .exec-card { background: var(--surface); border: 1px solid var(--bdr); border-radius: 14px; padding: 16px 18px; box-shadow: var(--shadow); position: relative; overflow: hidden; }
 .exec-card .ex-l { font-size: 12px; color: var(--ink3); font-weight: 500; }
 .exec-row { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
@@ -163,6 +164,7 @@ table.dt tbody tr:hover { background: var(--surface2); }
 .muted { color: var(--ink3); }
 .strong { font-weight: 700; }
 .danger { color: var(--red); font-weight: 700; }
+.ok { color: var(--grn); font-weight: 700; }
 
 /* ---------- badges ---------- */
 .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; white-space: nowrap; }
