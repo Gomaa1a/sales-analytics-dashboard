@@ -23,6 +23,20 @@ doesn't know falls into "Unknown."
 - Regions page now shows an **"Unmapped cities" banner** with the count/value/%
   in Unknown, so it's visible instead of silent.
 
+**Done 2026-07-05 (data-driven dictionary pass):**
+- Pulled every live `city` value (2,629 orders) and classified them: 780 orders /
+  303M IQD were "Unknown", but **701 of those (239M) had an empty city field** —
+  a data-entry gap in Odoo, not a dictionary gap.
+- **Split the bucket:** `govOf("")` now returns a distinct **`nocity` ("بدون
+  مدينة / No city")** governorate, and the Regions banner shows two separate
+  lines with two separate fixes: *no city in Odoo → fill the customer's City
+  field* (red) vs. *unrecognized city name → add to dictionary* (amber).
+- **Mapped all 26 remaining real strings** by cross-checking geography against
+  the owning rep's territory (each rep's other orders are 68–100% one
+  governorate). True "Unknown" is now **2 orders / ~3M IQD** (garbage values
+  `٩٩`, `داكير` — fix those in Odoo).
+- 23/23 regression cases pass (original 13 + new mappings + the nocity split).
+
 **Real fix (backend, not done here):** sync a real governorate from Odoo
 (`res.partner.state_id` or delivery address) into `dashboard_orders`, and use the
 dictionary only as a fallback. This removes the guessing entirely.

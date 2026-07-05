@@ -104,6 +104,8 @@
       region_basis: "الأساس: الطلبات المؤكدة (sale/done) بقيمة شاملة الضريبة، حسب تاريخ إنشاء الطلب. قد تختلف عن «تحليل الفواتير» في أودو الذي يعتمد على الفواتير والقيمة غير الشاملة للضريبة.",
       unmapped: "مدن غير مصنّفة",
       unmapped_note: "طلبات لم نستطع ربط مدينتها بمحافظة (اسم المدينة غير معروف في القاموس). راجع أسماء المدن في أودو أو أضِفها للقاموس.",
+      nocity: "بدون مدينة",
+      nocity_note: "طلبات لا تحتوي على مدينة أصلاً في أودو — يجب تعبئة حقل «المدينة» في ملف العميل داخل أودو حتى تُحتسب ضمن محافظتها.",
       govs_title: "المحافظات",
       cities_title: "المدن",
       gov_all: "كل المحافظات",
@@ -270,6 +272,8 @@
       region_basis: "Basis: confirmed orders (sale/done), tax-inclusive value, by order creation date. This can differ from Odoo's Invoice Analysis, which is invoice-based and untaxed.",
       unmapped: "Unmapped cities",
       unmapped_note: "Orders whose city could not be matched to a governorate (city name not in the dictionary). Review the city names in Odoo or add them to the dictionary.",
+      nocity: "No city recorded",
+      nocity_note: "Orders with no city at all in Odoo — fill the customer's City field in Odoo so they count under their governorate.",
       govs_title: "Governorates",
       cities_title: "Cities",
       gov_all: "All governorates",
@@ -680,6 +684,9 @@
     muthanna: { ar: "المثنى",      en: "Muthanna" },
     qadisiyah:{ ar: "القادسية",    en: "Qadisiyah" },
     maysan:   { ar: "ميسان",       en: "Maysan" },
+    // "nocity" = the order has NO city text at all (fix in Odoo, not here);
+    // "unknown" = there IS a city text but the dictionary doesn't know it.
+    nocity:   { ar: "بدون مدينة",  en: "No city" },
     unknown:  { ar: "غير محدد",    en: "Unknown" }
   };
   const CITY2GOV = {
@@ -752,7 +759,27 @@
     // Dhi Qar
     "البطحة": "dhiqar",
     // Maysan
-    "علي الغربي": "maysan"
+    "علي الغربي": "maysan",
+    // ---- 2026-07-05 additions: every remaining unmapped string in live data,
+    // assigned by cross-checking geography against the owning rep's territory
+    // (each rep's OTHER orders are 68–100% one governorate) ----
+    // Basra districts / variants
+    "المدينة": "basra", "الطويسة": "basra", "الجمعيات": "basra", "الجزائر": "basra",
+    "الحيانية": "basra", "الدير": "basra", "الخور": "basra", "الجنينة": "basra",
+    "الجزيرة": "basra", "ابي الخصيب": "basra", "الامن الداخلي": "basra",
+    // Nineveh (Mosul) districts
+    "الفيصلية": "nineveh", "الساحل الأيسر": "nineveh", "المهندسين": "nineveh",
+    "حي سومر": "nineveh", "الحود": "nineveh", "الزوية": "nineveh",
+    // Baghdad ("الجاردية" = typo of الجادرية, "اعلام" = حي الإعلام)
+    "الجاردية": "baghdad", "حي اور": "baghdad", "اعلام": "baghdad",
+    // Babil
+    "الحصوة": "babil", "ناحية الامام": "babil",
+    // Karbala
+    "المركزيه": "karbala",
+    // Typos: كؤكوك = كركوك (Kirkuk) · ارييل = اربيل (Erbil)
+    "كؤكوك": "kirkuk", "ارييل": "erbil",
+    // Anbar (free-text landmark; rep territory is 100% Anbar)
+    "قرب جامع الزبير ابن العوام": "anbar"
   };
   // Normalize a messy free-text Arabic city string so more values match:
   // strip diacritics/tatweel, unify alef/ya/hamza/ta-marbuta spellings, collapse
@@ -777,11 +804,11 @@
   // names themselves (so a city value that is actually a governorate maps too).
   const CITY2GOV_N = {};
   Object.keys(CITY2GOV).forEach(k => { const nk = normCity(k); if (nk) CITY2GOV_N[nk] = CITY2GOV[k]; });
-  Object.keys(GOV).forEach(code => { if (code === "unknown") return; const nk = normCity(GOV[code].ar); if (nk && !CITY2GOV_N[nk]) CITY2GOV_N[nk] = code; });
+  Object.keys(GOV).forEach(code => { if (code === "unknown" || code === "nocity") return; const nk = normCity(GOV[code].ar); if (nk && !CITY2GOV_N[nk]) CITY2GOV_N[nk] = code; });
   function govResult(code) { return { key: code, ar: GOV[code].ar, en: GOV[code].en }; }
   function govOf(city) {
     const raw = (city == null ? "" : String(city)).trim();
-    if (!raw || raw === "—") return govResult("unknown");
+    if (!raw || raw === "—") return govResult("nocity");
     if (CITY2GOV[raw]) return govResult(CITY2GOV[raw]);        // exact original (fast path)
     const n = normCity(raw);
     if (n && CITY2GOV_N[n]) return govResult(CITY2GOV_N[n]);   // normalized match

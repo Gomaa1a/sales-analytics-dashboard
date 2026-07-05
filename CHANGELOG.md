@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-07-05 — Kill the "Unknown" governorate bucket (data-driven)
+
+- Audited every live `city` value (2,629 orders): 780 orders / 303M IQD were
+  "Unknown". Root cause split: **701 orders (239M) have an empty city in Odoo**;
+  only 79 were genuinely unrecognized strings.
+- **New `nocity` bucket** ("بدون مدينة / No city"): empty city is now reported
+  separately from unrecognized city, each with its own fix instruction. Regions
+  page shows two banners (red = fill City field in Odoo; amber = add to
+  dictionary).
+- **+26 dictionary entries** — every remaining real string, assigned by
+  cross-checking geography against the owning rep's territory (68–100%
+  agreement): Basra districts (الحيانية، الطويسة، المدينة، الجزائر، الدير…),
+  Mosul (الفيصلية، الساحل الأيسر، المهندسين…), Baghdad (حي اور، اعلام، الجاردية),
+  Babil (الحصوة، ناحية الامام), plus typo fixes (كؤكوك→Kirkuk، ارييل→Erbil).
+- Result: true "Unknown" is now **2 orders / ~3M IQD** (garbage strings `٩٩`,
+  `داكير` — clean at the source in Odoo). 23/23 regression cases pass.
+- Cache-bust v=24.
+
 ## 2026-07-05 — Match Odoo: count sales by order date (date_order)
 
 - All order date-bucketing (Overview, Regions, Collections period sales,

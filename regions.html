@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Cities & Governorates</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=23" />
+  <link rel="stylesheet" href="assets/css/style.css?v=24" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗺️</text></svg>" />
 </head>
 <body>
@@ -47,8 +47,8 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=23"></script>
-  <script src="assets/js/common.js?v=23"></script>
+  <script src="assets/js/config.js?v=24"></script>
+  <script src="assets/js/common.js?v=24"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -135,20 +135,22 @@
       const totalVal = govs.reduce((s, x) => s + x.value, 0) || 1;
       $("cnt").textContent = `${D.fmtNum(govs.length)} ${D.t("govs_title")} · ${D.fmtNum(cities.length)} ${D.t("cities_title")}`;
 
-      // Surface how much value/how many orders fall into "Unknown" so unmapped
-      // cities are visible instead of silently swallowed (CEO trust concern).
-      const unk = gmap["unknown"];
+      // Surface how much value/how many orders escape classification, split by
+      // cause so each has its own fix: "nocity" = the Odoo record has no city
+      // (fill it in Odoo); "unknown" = city text the dictionary doesn't know
+      // (add it to CITY2GOV). Lumping them together hid the real problem.
+      const bannerLine = (bg, fg, bd, label, bucket, note) => {
+        const pct = Math.round(bucket.value / totalVal * 100);
+        return `<div class="err" style="background:${bg};color:${fg};border:1px solid ${bd};border-radius:10px;padding:10px 14px;margin:0 2px 12px;font-size:13px">` +
+          `⚠️ <b>${label}:</b> ${D.fmtNum(bucket.orders)} ${D.t("orders")} · ${D.fmtMoney(bucket.value)} (${pct}%). ${note}</div>`;
+      };
+      const unk = gmap["unknown"], noc = gmap["nocity"];
       const banner = $("unmappedBanner");
-      if (unk && unk.value > 0) {
-        const pct = Math.round(unk.value / totalVal * 100);
-        banner.style.display = "";
-        banner.innerHTML =
-          `<div class="err" style="background:#fef3c7;color:#92400e;border:1px solid #fde68a;border-radius:10px;padding:10px 14px;margin:0 2px 12px;font-size:13px">` +
-          `⚠️ <b>${D.t("unmapped")}:</b> ${D.fmtNum(unk.orders)} ${D.t("orders")} · ${D.fmtMoney(unk.value)} (${pct}%). ${D.t("unmapped_note")}</div>`;
-      } else {
-        banner.style.display = "none";
-        banner.innerHTML = "";
-      }
+      let bHtml = "";
+      if (noc && noc.value > 0) bHtml += bannerLine("#fee2e2", "#991b1b", "#fecaca", D.t("nocity"), noc, D.t("nocity_note"));
+      if (unk && unk.value > 0) bHtml += bannerLine("#fef3c7", "#92400e", "#fde68a", D.t("unmapped"), unk, D.t("unmapped_note"));
+      banner.style.display = bHtml ? "" : "none";
+      banner.innerHTML = bHtml;
 
       // governorate chart
       const ctx = $("govChart");
