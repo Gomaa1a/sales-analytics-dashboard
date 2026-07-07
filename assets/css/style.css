@@ -73,6 +73,11 @@ header.app {
 .icon-btn.lang { font-weight: 700; font-size: 13px; width: auto; padding: 0 12px; }
 .icon-btn.on { background: rgba(34,197,94,.25); }
 .updated { font-size: 11px; color: #9fb0d0; white-space: nowrap; }
+.user-chip {
+  font-size: 12px; font-weight: 600; color: #c7d2e8;
+  background: rgba(255,255,255,.08); padding: 7px 11px; border-radius: 9px;
+  white-space: nowrap; max-width: 160px; overflow: hidden; text-overflow: ellipsis;
+}
 
 /* ---------- layout ---------- */
 .wrap { max-width: 1280px; margin: 0 auto; padding: 22px 26px 60px; }

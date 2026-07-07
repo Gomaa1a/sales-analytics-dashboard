@@ -1,5 +1,56 @@
 # Changelog
 
+## 2026-07-07 — Match Odoo's daily order counts (audit-driven)
+
+- **Audited the "gap" vs Odoo for Jul 1–7:** Supabase has exactly the same 913
+  orders as Odoo (zero missing, zero duplicates). The visible difference was
+  (a) 36 cancelled/draft orders Odoo's list counts but the dashboard excludes
+  by policy, and (b) day-boundary drift from bucketing raw UTC timestamps.
+- **New `D.bagDay()`**: buckets datetimes into Asia/Baghdad calendar days, the
+  same way Odoo's screens group them. The Overview (`dayOf`) now uses it
+  everywhere; the fetch window is widened 1 UTC day so Baghdad-evening orders
+  on the first day aren't lost.
+- **"Orders per day" chart is now stacked**: blue = confirmed (still the only
+  thing any KPI counts), grey = cancelled/unconfirmed, so the bar total
+  matches Odoo's grouped Orders list. Tooltip shows both + "Total (as in
+  Odoo)". METRICS.md date axis corrected (`date_order`, Baghdad days).
+- Cache-bust v=26 (+ service worker VERSION).
+
+## 2026-07-07 — Login gate, admin panel & installable app (PWA)
+
+### Added — authentication (Supabase Auth + RLS)
+- **Username/password login** (`login.html`). Usernames map to synthetic
+  `ahmed@dabboos.app` emails; sessions are stored/refreshed by the new
+  `assets/js/auth.js` and every Supabase call now carries the user's JWT.
+- **Roles enforced by the database** (`supabase/auth-setup.sql`): `admin`
+  (everything + admin panel), `management` (all dashboard pages), `alerts`
+  (Alert Center only — RLS only serves them critical/warning order rows).
+  The anon key alone now reads **nothing**.
+- **Per-user page permissions** (`dash_users.pages` jsonb) override role
+  defaults; nav + page guard respect them.
+- Alert acknowledgements now record **who** acked (`acked_by`,
+  `acked_by_name`) instead of being anonymous.
+
+### Added — admin panel (`admin.html`, admins only)
+- Create users, edit full name / role / per-page checkboxes / active flag.
+  New and self-signed-up accounts start **inactive** (see nothing) until
+  activated. Self row is locked so you can't lock yourself out.
+- **Traffic**: every page load logs to `page_views`; the panel shows views
+  today / 7 days / active users, a 30-day per-day chart, by-page and by-user
+  breakdowns, and recent activity. Admin-read-only via RLS.
+
+### Added — PWA ("install like an app" on phones)
+- `manifest.webmanifest`, `service-worker.js`, generated icons
+  (`assets/icons/`), and meta tags on every page. Employees can Add to Home
+  Screen on Android/iOS; the dashboard opens standalone and full-screen.
+- The service worker never caches Supabase (numbers stay live); app shell is
+  network-first with offline fallback, CDN assets cache-first.
+
+### Docs
+- New `docs/AUTH.md` (setup order, security model and its honest boundaries),
+  updated `CLAUDE.md` hard rules, KNOWN_ISSUES #2 → 🟡 / #3 → ✅.
+- Cache-bust v=25 (+ service worker `VERSION` now tracks it).
+
 ## 2026-07-05 — Kill the "Unknown" governorate bucket (data-driven)
 
 - Audited every live `city` value (2,629 orders): 780 orders / 303M IQD were

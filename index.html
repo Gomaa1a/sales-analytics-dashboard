@@ -4,7 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Sales Command Center</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=24" />
+  <link rel="stylesheet" href="assets/css/style.css?v=26" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#0f1729" />
+  <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>" />
 </head>
 <body>
@@ -65,8 +70,9 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=24"></script>
-  <script src="assets/js/common.js?v=24"></script>
+  <script src="assets/js/config.js?v=26"></script>
+  <script src="assets/js/auth.js?v=26"></script>
+  <script src="assets/js/common.js?v=26"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -83,7 +89,9 @@
     const isConf = o => o.state === "sale" || o.state === "done";
     const val = o => Number(o.amount_total) || 0;
     const num = n => Number(n) || 0;
-    const dayOf = o => String(o.date_order || o.create_date || "").slice(0, 10);
+    // Baghdad calendar day (same as Odoo's on-screen grouping) — NOT the raw
+    // UTC slice, or evening orders land on the wrong day vs what Odoo shows.
+    const dayOf = o => D.bagDay(o.date_order || o.create_date);
     const inMonth = (o, ym) => dayOf(o).slice(0, 7) === ym;
     const TARGETS = (D.cfg.TARGETS || {});
     const TARGET = num(TARGETS.MONTHLY_REVENUE_TARGET);
@@ -120,8 +128,11 @@
 
     async function loadWindow(from, to) {
       try {
+        // fetch one extra UTC day at the start: a Baghdad day begins at 21:00
+        // UTC the previous evening, and dayOf() buckets by Baghdad day
+        const prevDay = s => { const d = new Date(s + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() - 1); return d.toISOString().slice(0, 10); };
         [allRows, payments] = await Promise.all([
-          D.loadOrders({ from, to, dateField: "date_order",
+          D.loadOrders({ from: prevDay(from), to, dateField: "date_order",
             select: "order_id,order_name,partner_name,salesperson,user_id,city,state,amount_total,create_date,date_order" }),
           D.loadPayments({ from, to })
         ]);
@@ -240,7 +251,7 @@
       renderLeaderboard(confAll, paysRC);
 
       // ----- charts (filter-range) -----
-      drawByDay(rConf);
+      drawByDay(rangeRows);
       drawTopCustomers(rConf);
     }
 
@@ -308,21 +319,38 @@
       return s + ".";
     }
 
-    function drawByDay(conf) {
+    function drawByDay(rows) {
+      // Stacked: confirmed (blue) + cancelled/unconfirmed (grey), bucketed by
+      // Baghdad day. The bar TOTAL matches Odoo's grouped Orders list (which
+      // counts every record), while the blue segment remains the only thing
+      // any KPI/total ever counts (hard rule: cancelled is never a sale).
       const m = {};
-      conf.forEach(o => { const d = dayOf(o); if (!d) return; if (!m[d]) m[d] = { orders: 0, value: 0 }; m[d].orders++; m[d].value += val(o); });
+      rows.forEach(o => {
+        const d = dayOf(o); if (!d) return;
+        if (!m[d]) m[d] = { conf: 0, value: 0, other: 0 };
+        if (isConf(o)) { m[d].conf++; m[d].value += val(o); } else { m[d].other++; }
+      });
       const days = Object.keys(m).sort();
       const ctx = document.getElementById("dayChart");
       if (dayChart) dayChart.destroy();
       dayChart = new Chart(ctx, {
         type: "bar",
-        data: { labels: days.map(d => d.slice(8, 10) + "/" + d.slice(5, 7)), datasets: [{
-          label: D.t("orders_count"), data: days.map(d => m[d].orders),
-          backgroundColor: "#2563eb", borderRadius: 5, maxBarThickness: 34 }] },
+        data: { labels: days.map(d => d.slice(8, 10) + "/" + d.slice(5, 7)), datasets: [
+          { label: D.t("ov_confirmed"), data: days.map(d => m[d].conf),
+            backgroundColor: "#2563eb", borderRadius: 5, maxBarThickness: 34 },
+          { label: D.t("ov_not_confirmed"), data: days.map(d => m[d].other),
+            backgroundColor: "#cbd5e1", borderRadius: 5, maxBarThickness: 34 }
+        ] },
         options: { maintainAspectRatio: false,
-          plugins: { legend: { display: false }, tooltip: { callbacks: {
-            label: c => `${D.fmtNum(c.parsed.y)} ${D.t("orders")} · ${D.fmtMoney(m[days[c.dataIndex]].value)}` } } },
-          scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+          plugins: { legend: { display: true, position: "bottom" }, tooltip: { callbacks: {
+            label: c => c.datasetIndex === 0
+              ? `${D.t("ov_confirmed")}: ${D.fmtNum(c.parsed.y)} ${D.t("orders")} · ${D.fmtMoney(m[days[c.dataIndex]].value)}`
+              : `${D.t("ov_not_confirmed")}: ${D.fmtNum(c.parsed.y)}`,
+            footer: items => {
+              const b = m[days[items[0].dataIndex]];
+              return `${D.t("ov_total_incl")}: ${D.fmtNum(b.conf + b.other)}`;
+            } } } },
+          scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } } } }
       });
     }
 
