@@ -35,20 +35,37 @@ rather than guessing.
    call `dedupeBy(rows, "order_id" / "payment_id")`. Keep it — the n8n sync can
    emit duplicate rows and inflate every total. Real fix is upsert in n8n.
 5. **Bump the cache-buster.** Assets are referenced as `?v=NN` in every HTML
-   file. If you change `common.js`/`config.js`/`style.css`/`order-modal.js`,
-   bump `NN` in **all** HTML files or clients keep stale code.
+   file. If you change `common.js`/`config.js`/`auth.js`/`style.css`/
+   `order-modal.js`, bump `NN` in **all** HTML files AND `VERSION` in
+   `service-worker.js`, or clients keep stale code.
+6. **Auth is enforced by RLS, not by the UI.** Every page loads `auth.js`
+   (after `config.js`, before `common.js`); it guards the page and attaches
+   the user's JWT to every Supabase call. Roles/permissions live in the
+   `dash_users` table (`supabase/auth-setup.sql` + `docs/AUTH.md`). Never
+   "fix" access by only hiding a nav link — the database policy is the control.
+7. **The service worker must never cache Supabase requests.** Data and auth
+   go straight to the network — a cached number is a wrong number.
 
 ## Where things live
 - `assets/js/common.js` — the shared library: i18n, formatting, `esc`, Supabase
   API layer, governorate mapping, data loaders. Exposes everything on `window.DASH`.
 - `assets/js/config.js` — Supabase URL/anon key, table names, poll interval,
   currency, targets. The only file with environment-specific values.
+- `assets/js/auth.js` — the auth gate: Supabase Auth session (username →
+  synthetic `@dabboos.app` email), page guard, role/permission logic, traffic
+  ping. Exposes `window.DASH_AUTH`.
 - `assets/js/order-modal.js` — the click-to-drill-down order modal.
 - `index.html` (Overview), `regions.html`, `salespeople.html`,
   `collections.html`, `debt.html`, `alerts.html` — one file per page; each has
   an inline `<script>` that uses `window.DASH`.
+- `login.html` — sign-in page; `admin.html` — admin panel (users, permissions,
+  traffic). See `docs/AUTH.md`.
 - `acknowledgments.html` — redirect stub (merged into `alerts.html`).
-- `docs/` — architecture, metric definitions, known issues.
+- `manifest.webmanifest`, `service-worker.js`, `assets/icons/` — PWA install
+  ("add to home screen") support.
+- `supabase/auth-setup.sql` — one-time script: profile + traffic tables and
+  the full RLS lockdown.
+- `docs/` — architecture, metric definitions, known issues, auth guide.
 
 ## Conventions
 - Calendar anchors use **Asia/Baghdad**; the week starts **Saturday**.

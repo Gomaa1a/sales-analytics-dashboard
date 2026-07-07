@@ -186,6 +186,53 @@
       search_ph: "بحث: طلب، عميل، مندوب، مدينة…",
       export_pdf: "تصدير PDF",
       sound_on: "الصوت مفعّل", sound_off: "الصوت متوقف",
+      // auth + admin panel
+      nav_admin: "لوحة التحكم",
+      logout: "تسجيل الخروج",
+      login_title: "تسجيل الدخول",
+      login_sub: "أدخل اسم المستخدم وكلمة المرور للمتابعة",
+      login_user: "اسم المستخدم",
+      login_pass: "كلمة المرور",
+      login_btn: "دخول",
+      login_wait: "جارٍ الدخول…",
+      login_err: "اسم المستخدم أو كلمة المرور غير صحيحة",
+      login_inactive: "الحساب غير مفعّل — راجع مسؤول النظام",
+      login_noprofile: "لا يوجد ملف لهذا المستخدم — راجع مسؤول النظام",
+      admin_title: "لوحة التحكم",
+      admin_sub: "إدارة المستخدمين والصلاحيات ومتابعة حركة الاستخدام",
+      admin_users: "المستخدمون",
+      admin_traffic: "حركة الاستخدام",
+      admin_create: "إضافة مستخدم جديد",
+      admin_create_btn: "إنشاء المستخدم",
+      admin_created: "تم إنشاء المستخدم وتفعيله ✓",
+      admin_saved: "تم حفظ التغييرات ✓",
+      admin_save: "حفظ",
+      admin_active: "مفعّل",
+      admin_suspended: "موقوف",
+      admin_role: "الدور",
+      role_admin: "مسؤول",
+      role_management: "إدارة",
+      role_alerts: "تنبيهات فقط",
+      admin_pages: "الصفحات المسموح بها",
+      admin_user_col: "المستخدم",
+      admin_fullname: "الاسم الكامل",
+      admin_password: "كلمة المرور (٦ أحرف على الأقل)",
+      admin_username_ph: "اسم المستخدم (إنجليزي بدون مسافات)",
+      admin_err: "فشلت العملية — حاول مرة أخرى",
+      admin_user_exists: "اسم المستخدم مستخدم مسبقاً",
+      admin_you: "هذا حسابك",
+      admin_pw_note: "لإعادة تعيين كلمة مرور مستخدم: من لوحة Supabase → Authentication → Users، أو أوقف الحساب وأنشئ حساباً جديداً.",
+      tr_views_today: "زيارات اليوم",
+      tr_views_7: "زيارات آخر ٧ أيام",
+      tr_users_7: "مستخدمون نشطون (٧ أيام)",
+      tr_per_day: "الزيارات حسب اليوم (آخر ٣٠ يوماً)",
+      tr_by_page: "حسب الصفحة (٧ أيام)",
+      tr_by_user: "حسب المستخدم (٧ أيام)",
+      tr_recent: "آخر النشاطات",
+      tr_page: "الصفحة",
+      tr_views: "الزيارات",
+      tr_when: "الوقت",
+      tr_empty: "لا توجد بيانات بعد",
       states: { draft: "عرض سعر", sent: "مُرسل", sale: "طلب مؤكد", done: "مكتمل", cancel: "ملغي" },
       trust: { good: "جيد", normal: "عادي", bad: "سيء" }
     },
@@ -353,6 +400,53 @@
       search_ph: "Search: order, customer, rep, city…",
       export_pdf: "Export PDF",
       sound_on: "Sound on", sound_off: "Sound off",
+      // auth + admin panel
+      nav_admin: "Admin Panel",
+      logout: "Log out",
+      login_title: "Sign in",
+      login_sub: "Enter your username and password to continue",
+      login_user: "Username",
+      login_pass: "Password",
+      login_btn: "Sign in",
+      login_wait: "Signing in…",
+      login_err: "Wrong username or password",
+      login_inactive: "This account is not active — contact the administrator",
+      login_noprofile: "No profile for this user — contact the administrator",
+      admin_title: "Admin Panel",
+      admin_sub: "Manage users, permissions and usage traffic",
+      admin_users: "Users",
+      admin_traffic: "Traffic",
+      admin_create: "Add a new user",
+      admin_create_btn: "Create user",
+      admin_created: "User created and activated ✓",
+      admin_saved: "Changes saved ✓",
+      admin_save: "Save",
+      admin_active: "Active",
+      admin_suspended: "Suspended",
+      admin_role: "Role",
+      role_admin: "Admin",
+      role_management: "Management",
+      role_alerts: "Alerts only",
+      admin_pages: "Allowed pages",
+      admin_user_col: "User",
+      admin_fullname: "Full name",
+      admin_password: "Password (min 6 characters)",
+      admin_username_ph: "username (english, no spaces)",
+      admin_err: "Operation failed — try again",
+      admin_user_exists: "Username already taken",
+      admin_you: "This is your account",
+      admin_pw_note: "To reset a user's password: Supabase dashboard → Authentication → Users, or suspend the account and create a new one.",
+      tr_views_today: "Views today",
+      tr_views_7: "Views last 7 days",
+      tr_users_7: "Active users (7 days)",
+      tr_per_day: "Views per day (last 30 days)",
+      tr_by_page: "By page (7 days)",
+      tr_by_user: "By user (7 days)",
+      tr_recent: "Recent activity",
+      tr_page: "Page",
+      tr_views: "Views",
+      tr_when: "When",
+      tr_empty: "No data yet",
       states: { draft: "Quotation", sent: "Sent", sale: "Confirmed", done: "Done", cancel: "Cancelled" },
       trust: { good: "Good", normal: "Normal", bad: "Bad" }
     }
@@ -405,14 +499,40 @@
     return d.toLocaleTimeString(isAR() ? "ar-EG" : "en-GB", { hour: "2-digit", minute: "2-digit" });
   }
 
-  /* ---------------- API (reads Supabase REST directly) ---------------- */
+  /* ---------------- API (reads Supabase REST directly) ----------------
+     Every request carries the logged-in user's JWT (auth.js) so Row-Level
+     Security in Supabase decides what the caller may see. The anon key by
+     itself reads nothing once supabase/auth-setup.sql has been applied. */
+  async function authHeaders(extra) {
+    const A = window.DASH_AUTH;
+    if (A) { await A.ensureToken(); return A.headers(extra); }
+    return Object.assign(
+      { apikey: CFG.SUPABASE_ANON_KEY, Authorization: "Bearer " + CFG.SUPABASE_ANON_KEY },
+      extra || {});
+  }
+  function authFail(res) {
+    // 401 = the JWT is expired/revoked → back to the login page.
+    if (res.status === 401 && window.DASH_AUTH) { window.DASH_AUTH.signOut(); return true; }
+    return false;
+  }
+
   async function sbGet(pathAndQuery) {
     const base = CFG.SUPABASE_URL.replace(/\/$/, "");
-    const res = await fetch(base + "/rest/v1/" + pathAndQuery, {
-      headers: { apikey: CFG.SUPABASE_ANON_KEY, Authorization: "Bearer " + CFG.SUPABASE_ANON_KEY }
-    });
-    if (!res.ok) throw new Error("Supabase HTTP " + res.status);
+    const res = await fetch(base + "/rest/v1/" + pathAndQuery, { headers: await authHeaders() });
+    if (!res.ok) { authFail(res); throw new Error("Supabase HTTP " + res.status); }
     return res.json();
+  }
+
+  // Generic authorized write (used by the admin panel: PATCH dash_users …).
+  async function sbWrite(method, pathAndQuery, body) {
+    const base = CFG.SUPABASE_URL.replace(/\/$/, "");
+    const res = await fetch(base + "/rest/v1/" + pathAndQuery, {
+      method: method,
+      headers: await authHeaders({ "Content-Type": "application/json", Prefer: "return=representation" }),
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) { authFail(res); throw new Error("Supabase HTTP " + res.status); }
+    return res.status === 204 ? null : res.json();
   }
 
   async function snapshot(key) {
@@ -466,24 +586,25 @@
     throw new Error("unknown endpoint: " + endpointKey);
   }
 
-  /* ---------------- write: acknowledge an alert (anonymous) ---------------- */
+  /* ---------------- write: acknowledge an alert ---------------- */
   async function ackAlert(order, note) {
+    const prof = window.DASH_AUTH ? window.DASH_AUTH.profile() : null;
     const row = {
       order_id: order.order_id != null ? order.order_id : order.id,
       order_name: order.order_name || order.name || "",
       level: order.level || (order.risk && order.risk.level) || "",
       amount_total: Number(order.amount_total) || 0,
-      note: note || null
+      note: note || null,
+      acked_by: prof ? prof.user_id : null,
+      acked_by_name: prof ? (prof.full_name || prof.username) : null
     };
     const base = CFG.SUPABASE_URL.replace(/\/$/, "");
     const res = await fetch(base + "/rest/v1/alert_acks", {
-      headers: {
-        apikey: CFG.SUPABASE_ANON_KEY, Authorization: "Bearer " + CFG.SUPABASE_ANON_KEY,
-        "Content-Type": "application/json", Prefer: "return=minimal"
-      },
+      method: "POST",
+      headers: await authHeaders({ "Content-Type": "application/json", Prefer: "return=minimal" }),
       body: JSON.stringify(row)
     });
-    if (!res.ok) throw new Error("ack failed HTTP " + res.status);
+    if (!res.ok) { authFail(res); throw new Error("ack failed HTTP " + res.status); }
     return { ok: true };
   }
 
@@ -545,7 +666,8 @@
     { key: "nav_sales", href: "salespeople.html", id: "sales", group: "sales" },
     { key: "nav_collections", href: "collections.html", id: "collections", group: "money" },
     { key: "nav_debt", href: "debt.html", id: "debt", group: "money" },
-    { key: "nav_alerts", href: "alerts.html", id: "alerts", group: "risk" }
+    { key: "nav_alerts", href: "alerts.html", id: "alerts", group: "risk" },
+    { key: "nav_admin", href: "admin.html", id: "admin", group: "admin" }
   ];
 
   function renderSoundBtn() {
@@ -562,6 +684,11 @@
 
     const header = document.getElementById("appHeader");
     if (header) {
+      // Only show the pages this user may open (auth.js). The nav is UX —
+      // the real enforcement is auth.js's guard + Row-Level Security.
+      const A = window.DASH_AUTH;
+      const prof = A ? A.profile() : null;
+      const visible = A ? PAGES.filter(p => A.canView(p.id)) : PAGES;
       header.innerHTML = `
         <div class="hd-brand">
           <div class="hd-logo">DB</div>
@@ -571,8 +698,8 @@
           </div>
         </div>
         <nav class="hd-nav">
-          ${PAGES.map((p, i) => {
-            const sep = (i > 0 && PAGES[i - 1].group !== p.group) ? `<span class="nav-sep"></span>` : "";
+          ${visible.map((p, i) => {
+            const sep = (i > 0 && visible[i - 1].group !== p.group) ? `<span class="nav-sep"></span>` : "";
             return sep + `<a href="${p.href}" class="${p.id === activeId ? "active" : ""}">${t(p.key)}</a>`;
           }).join("")}
         </nav>
@@ -581,6 +708,8 @@
           <button id="soundBtn" class="icon-btn" type="button"></button>
           <button id="pdfBtn" class="icon-btn" type="button" title="${t("export_pdf")}">🖨️</button>
           <button id="langBtn" class="icon-btn lang" type="button">${t("lang_btn")}</button>
+          ${prof ? `<span class="user-chip" title="${esc(prof.username)}">👤 ${esc(prof.full_name || prof.username)}</span>
+          <button id="logoutBtn" class="icon-btn" type="button" title="${t("logout")}">⏻</button>` : ""}
           <span id="updatedAt" class="updated"></span>
         </div>`;
       document.getElementById("langBtn").addEventListener("click", () => {
@@ -591,6 +720,8 @@
       document.getElementById("soundBtn").addEventListener("click", toggleSound);
       // Export PDF = browser print dialog → "Save as PDF" (print stylesheet cleans the page)
       document.getElementById("pdfBtn").addEventListener("click", () => window.print());
+      const lo = document.getElementById("logoutBtn");
+      if (lo) lo.addEventListener("click", () => window.DASH_AUTH.signOut());
       renderSoundBtn();
     }
   }
@@ -853,9 +984,9 @@
       const sep = pathAndQuery.includes("?") ? "&" : "?";
       const res = await fetch(base + "/rest/v1/" + pathAndQuery + `${sep}limit=${PAGE}&offset=${offset}`, {
         method: "GET", cache: "no-store",
-        headers: { apikey: CFG.SUPABASE_ANON_KEY, Authorization: "Bearer " + CFG.SUPABASE_ANON_KEY }
+        headers: await authHeaders()
       });
-      if (!res.ok) throw new Error("Supabase HTTP " + res.status);
+      if (!res.ok) { authFail(res); throw new Error("Supabase HTTP " + res.status); }
       const rows = await res.json();
       out.push(...rows);
       if (rows.length < PAGE) break;
@@ -886,13 +1017,23 @@
     return rows.map(r => ({ ...r, amount: Number(r.amount) || 0 }));
   }
 
+  /* ---------------- PWA: service worker ----------------
+     Registered from the shared library so every page (including login)
+     keeps the app installable. Requires HTTPS (or localhost). */
+  if ("serviceWorker" in navigator &&
+      (location.protocol === "https:" || ["localhost", "127.0.0.1"].includes(location.hostname))) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("service-worker.js").catch(() => { /* non-fatal */ });
+    });
+  }
+
   /* ---------------- expose ---------------- */
   window.DASH = {
     t, isAR, lang: () => LANG, esc,
     fmtNum, fmtMoney, fmtMoneyFull, fmtDate, fmtTime,
     api, ackAlert, beep, toast, notify, buildChrome, setUpdated, renderSoundBtn,
     stateLabel, trustLabel, filterBar,
-    govOf, govLabel, GOV, loadOrders, loadPayments, sbGetAll, nextDay,
+    govOf, govLabel, GOV, loadOrders, loadPayments, sbGetAll, sbWrite, nextDay,
     cfg: CFG
   };
 })();

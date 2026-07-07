@@ -1,5 +1,40 @@
 # Changelog
 
+## 2026-07-07 — Login gate, admin panel & installable app (PWA)
+
+### Added — authentication (Supabase Auth + RLS)
+- **Username/password login** (`login.html`). Usernames map to synthetic
+  `ahmed@dabboos.app` emails; sessions are stored/refreshed by the new
+  `assets/js/auth.js` and every Supabase call now carries the user's JWT.
+- **Roles enforced by the database** (`supabase/auth-setup.sql`): `admin`
+  (everything + admin panel), `management` (all dashboard pages), `alerts`
+  (Alert Center only — RLS only serves them critical/warning order rows).
+  The anon key alone now reads **nothing**.
+- **Per-user page permissions** (`dash_users.pages` jsonb) override role
+  defaults; nav + page guard respect them.
+- Alert acknowledgements now record **who** acked (`acked_by`,
+  `acked_by_name`) instead of being anonymous.
+
+### Added — admin panel (`admin.html`, admins only)
+- Create users, edit full name / role / per-page checkboxes / active flag.
+  New and self-signed-up accounts start **inactive** (see nothing) until
+  activated. Self row is locked so you can't lock yourself out.
+- **Traffic**: every page load logs to `page_views`; the panel shows views
+  today / 7 days / active users, a 30-day per-day chart, by-page and by-user
+  breakdowns, and recent activity. Admin-read-only via RLS.
+
+### Added — PWA ("install like an app" on phones)
+- `manifest.webmanifest`, `service-worker.js`, generated icons
+  (`assets/icons/`), and meta tags on every page. Employees can Add to Home
+  Screen on Android/iOS; the dashboard opens standalone and full-screen.
+- The service worker never caches Supabase (numbers stay live); app shell is
+  network-first with offline fallback, CDN assets cache-first.
+
+### Docs
+- New `docs/AUTH.md` (setup order, security model and its honest boundaries),
+  updated `CLAUDE.md` hard rules, KNOWN_ISSUES #2 → 🟡 / #3 → ✅.
+- Cache-bust v=25 (+ service worker `VERSION` now tracks it).
+
 ## 2026-07-05 — Kill the "Unknown" governorate bucket (data-driven)
 
 - Audited every live `city` value (2,629 orders): 780 orders / 303M IQD were
