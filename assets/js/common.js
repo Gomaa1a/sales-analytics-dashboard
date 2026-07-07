@@ -39,7 +39,9 @@
       orders: "طلب",
       ov_sub: "ملخص عالي المستوى — استخدم البحث لتحديث كل البيانات",
       ov_confirmed: "الطلبات المؤكدة",
-      ov_orders_day: "الطلبات المؤكدة لكل يوم",
+      ov_orders_day: "الطلبات لكل يوم",
+      ov_not_confirmed: "ملغي / غير مؤكد",
+      ov_total_incl: "الإجمالي كما في أودو",
       ov_top_govs: "أعلى المحافظات (قيمة)",
       ov_customers: "عدد العملاء",
       ov_status_mix: "توزيع حالات الطلبات",
@@ -257,7 +259,9 @@
       orders: "orders",
       ov_sub: "High-level summary — use search to update all data",
       ov_confirmed: "Confirmed orders",
-      ov_orders_day: "Confirmed orders per day",
+      ov_orders_day: "Orders per day",
+      ov_not_confirmed: "Cancelled / unconfirmed",
+      ov_total_incl: "Total (as in Odoo)",
       ov_top_govs: "Top governorates (value)",
       ov_customers: "Customers",
       ov_status_mix: "Order status mix",
@@ -487,6 +491,17 @@
     const cur = isAR() ? CFG.CURRENCY_AR : CFG.CURRENCY;
     if (n === null || n === undefined || n === false || isNaN(n)) return "—";
     return Number(n).toLocaleString("en-US", { maximumFractionDigits: 0 }) + " " + cur;
+  }
+  // Convert a stored UTC datetime ("2026-07-01 20:11:19") to its Asia/Baghdad
+  // calendar day "YYYY-MM-DD". Odoo stores datetimes in UTC but displays and
+  // groups them in the user's timezone — bucketing by Baghdad day keeps the
+  // dashboard's daily numbers aligned with what Odoo screens show.
+  function bagDay(s) {
+    if (!s) return "";
+    const str = String(s);
+    const d = new Date(str.includes("T") ? str : str.replace(" ", "T") + "Z");
+    if (isNaN(d)) return str.slice(0, 10);
+    return d.toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" });
   }
   function fmtDate(s) {
     if (!s) return "—";
@@ -1033,7 +1048,7 @@
     fmtNum, fmtMoney, fmtMoneyFull, fmtDate, fmtTime,
     api, ackAlert, beep, toast, notify, buildChrome, setUpdated, renderSoundBtn,
     stateLabel, trustLabel, filterBar,
-    govOf, govLabel, GOV, loadOrders, loadPayments, sbGetAll, sbWrite, nextDay,
+    govOf, govLabel, GOV, loadOrders, loadPayments, sbGetAll, sbWrite, nextDay, bagDay,
     cfg: CFG
   };
 })();

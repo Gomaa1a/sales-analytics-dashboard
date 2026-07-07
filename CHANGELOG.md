@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-07-07 — Match Odoo's daily order counts (audit-driven)
+
+- **Audited the "gap" vs Odoo for Jul 1–7:** Supabase has exactly the same 913
+  orders as Odoo (zero missing, zero duplicates). The visible difference was
+  (a) 36 cancelled/draft orders Odoo's list counts but the dashboard excludes
+  by policy, and (b) day-boundary drift from bucketing raw UTC timestamps.
+- **New `D.bagDay()`**: buckets datetimes into Asia/Baghdad calendar days, the
+  same way Odoo's screens group them. The Overview (`dayOf`) now uses it
+  everywhere; the fetch window is widened 1 UTC day so Baghdad-evening orders
+  on the first day aren't lost.
+- **"Orders per day" chart is now stacked**: blue = confirmed (still the only
+  thing any KPI counts), grey = cancelled/unconfirmed, so the bar total
+  matches Odoo's grouped Orders list. Tooltip shows both + "Total (as in
+  Odoo)". METRICS.md date axis corrected (`date_order`, Baghdad days).
+- Cache-bust v=26 (+ service worker VERSION).
+
 ## 2026-07-07 — Login gate, admin panel & installable app (PWA)
 
 ### Added — authentication (Supabase Auth + RLS)
