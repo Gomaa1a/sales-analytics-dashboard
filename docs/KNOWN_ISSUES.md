@@ -41,23 +41,19 @@ doesn't know falls into "Unknown."
 (`res.partner.state_id` or delivery address) into `dashboard_orders`, and use the
 dictionary only as a fallback. This removes the guessing entirely.
 
-## 2. 🔴 Security model depends on unverified RLS
-`config.js` says the anon key is safe "because tables are read-only via RLS (see
-`supabase/schema.sql`)" — **but that schema file does not exist in the repo.**
-The entire security posture rests on policies that aren't captured anywhere.
+## 2. 🟡 Security model depends on RLS — now captured in the repo
+`config.js` used to point at a `supabase/schema.sql` that didn't exist. The
+policies are now **written down and reproducible**: `supabase/auth-setup.sql`
+revokes all `anon` access and grants reads to logged-in, active users only
+(per-role — see `docs/AUTH.md`). 🟡 not ✅ because it's only real once the
+script has actually been **run** in the Supabase project — verify with
+`select * from pg_policies where schemaname = 'public';`.
 
-**Action (you, in Supabase dashboard):**
-- Confirm `anon` has **SELECT-only** on `dashboard_orders`, `dashboard_payments`,
-  `dashboard_snapshots`.
-- Confirm `alert_acks` allows `anon` **INSERT** but not UPDATE/DELETE, and
-  doesn't expose sensitive columns on SELECT.
-- Confirm **no other table** is exposed to `anon`.
-- Then commit the policies as `supabase/schema.sql` so the model is reproducible.
-
-## 3. 🔴 No authentication in front of financial data
-The dashboard serves sales, receivables, credit limits, and per-customer debt
-with only the public anon key — anyone with the URL sees everything. Put it
-behind an access gate (Cloudflare Access, Netlify password, VPN, etc.).
+## 3. ✅ No authentication in front of financial data (FIXED 2026-07)
+The dashboard is now behind a username/password gate (Supabase Auth) with
+roles (`admin` / `management` / `alerts`) enforced by Row-Level Security, a
+login page, and an admin panel for user/permission management + traffic.
+See `docs/AUTH.md` for setup and the security model's honest boundaries.
 
 ## 4. 🟡 "606 orders" — possible duplicate sync rows
 A count that looks impossibly high is usually duplicate rows in

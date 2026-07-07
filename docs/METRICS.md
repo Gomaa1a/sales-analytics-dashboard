@@ -11,9 +11,13 @@ tool loses credibility. **Read this before changing any calculation.**
 2. **Tax-inclusive vs. untaxed.** All amounts use Odoo's `amount_total`, which is
    **tax-inclusive**. Odoo's *Invoice Analysis* report defaults to **Untaxed
    Total**. Same transactions, different number.
-3. **Which date.** Aggregation is by **`create_date`** (when the order record was
-   created), not `date_order` or `invoice_date`. For imported/backdated orders
-   these can differ and shift an order into another month/year.
+3. **Which date.** Order aggregation is by **`date_order`** (Odoo's "Order
+   Date" — the same basis as Odoo's Sales screens; it moves to the confirmation
+   time when a quotation is confirmed), not `create_date` or `invoice_date`.
+   Days are bucketed in the **Asia/Baghdad** calendar (Odoo stores UTC but
+   displays/groups in the user's timezone) — see `D.bagDay()` in `common.js`.
+   The Overview uses this everywhere (`dayOf`); a UTC slice would put
+   late-evening orders on the wrong day vs the Odoo screen.
 
 ### ⚠️ Reconciling with Odoo "Invoice Analysis"
 The regions numbers will **not** match Odoo's Invoice Analysis by default,
@@ -34,6 +38,14 @@ and surfaces an "Unmapped cities" banner so unclassified value is visible.
 ## Confirmed sales
 `state ∈ {sale, done}`, summing `amount_total`. Quotations (`draft`, `sent`) and
 `cancel` are excluded. Used on Overview, Regions, Salespeople.
+
+## Orders per day (Overview chart)
+Stacked bar per Baghdad day: **blue = confirmed** (`sale`/`done`, the only
+segment any KPI counts) + **grey = cancelled/unconfirmed**. The bar TOTAL
+therefore matches Odoo's grouped Orders list, which counts every record
+including cancelled — verified 2026-07-07 against Odoo for Jul 1–7 (913 = 913,
+zero missing/duplicate rows; the visible per-day "gap" was exactly the 36
+cancelled/draft orders Odoo includes and the dashboard excludes by policy).
 
 ## Conversion rate
 `confirmed / (confirmed + quotations)` by order **count** within the filter
