@@ -1,4 +1,4 @@
-﻿/* ============================================================
+/* ============================================================
    Dabboos Sales Command Center â€” service worker (PWA)
    Keep VERSION in sync with the ?v=NN cache-buster in the HTML
    files: bumping it here drops every old cache on next visit.
@@ -8,7 +8,7 @@
      â€¢ Same-origin app shell   â†’ network-first, cache fallback (offline).
      â€¢ CDN assets (Chart.jsâ€¦)  â†’ cache-first (URLs are versioned).
    ============================================================ */
-const VERSION = "v27";
+const VERSION = "v28";
 const CACHE = "dabboos-" + VERSION;
 
 self.addEventListener("install", () => {

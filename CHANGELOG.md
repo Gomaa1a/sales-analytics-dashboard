@@ -1,5 +1,41 @@
 # Changelog
 
+## 2026-07-08 — Overview v2: business-owner metrics (audit-driven)
+
+### Fixed
+- **MoM was misleading:** it compared the partial current month against the
+  FULL last month. Now compares month-to-date vs the same days of last month,
+  and hides the delta entirely when history doesn't cover the compared days.
+
+### Added — Overview
+- **Today strip:** sales & cash now show "vs 4-week same-weekday average";
+  new "cash in process" aging flag (⚠ N payments older than 3 days + amount);
+  new 4th KPI: orders today + cancelled today.
+- **Overdue card:** receivables age strip (≤30 / 31–60 / >60 DSO customer
+  buckets) + total credit exposure — from the collections snapshot the page
+  already downloads, labeled "as of latest snapshot".
+- **Minis:** cancel rate % and top-10 customer share of period revenue.
+- **Debtors table:** DSO column (red when >60d).
+- **Rep leaderboard:** cash-in-transit and critical-orders columns per rep.
+- **New chart:** weekly confirmed revenue, last 6 Saturday-start weeks
+  (current partial week drawn lighter). No extra data fetched.
+- **New panel:** "Cash in transit — who holds it now?" top courier journals
+  with amount + oldest payment age (red past 3 days).
+- Rejected during verification: "confirmed, not delivered" from
+  `delivery_count` — Odoo counts pickings created at confirmation, not goods
+  delivered; the number would lie (see METRICS.md).
+
+### Docs
+- **`docs/N8N_AUDIT.md`** — full audit of the n8n sync with proofs: snapshot
+  reads silently truncated at Supabase's 1,000-row cap (summary says 964 July
+  orders, table has 986), payment states never heal (32 stale in_process),
+  payments fetch fragile (limit 800, no date filter), 2h payment lag,
+  dashboard_customers upsert never lands, UTC/Baghdad day mixing in
+  snapshots, missing backfill after downtime, service key hygiene + Supabase
+  index/table recommendations.
+- New helpers `D.addDays` / `D.weekStartSat` (8 unit tests pass); metrics
+  bases documented in METRICS.md. Cache-bust v=28.
+
 ## 2026-07-07 — Match Odoo's daily order counts (audit-driven)
 
 - **Audited the "gap" vs Odoo for Jul 1–7:** Supabase has exactly the same 913

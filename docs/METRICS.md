@@ -81,6 +81,30 @@ concentration" = top-10 debtors' share of total overdue.
 point-in-time balance with a single month of order value. Do not quote as a
 precise finance metric.
 
+## Overview v2 additions (2026-07-08)
+- **MoM delta** = confirmed MTD vs **the same number of days of last month**
+  (day-of-month ≤ today's). Never partial-vs-full. The delta is hidden when
+  the loaded data doesn't cover the compared days (history starts mid-June
+  2026) — no delta beats a wrong delta.
+- **"vs typical" on Today KPIs** = today vs the average of the last 4 same
+  weekdays (Baghdad days), from the loaded window. Hidden when the average is 0.
+- **Cash in transit** = payments with `state = in_process`; "stuck" = older
+  than 3 days by collection `date`. Grouped by the Odoo `journal` (the courier
+  holding the money). ⚠ accuracy depends on the payments sync healing states —
+  see `N8N_AUDIT.md` #2.
+- **Receivables age strip** = `dso_buckets` from the `collections` snapshot
+  (customer counts ≤30 / 31–60 / >60 DSO days) — labeled "as of latest
+  snapshot", not date-filtered. Credit exposure comes from the same snapshot.
+- **Top-10 customer share** = top 10 customers' confirmed value ÷ all
+  confirmed value in the filter range.
+- **Cancel rate** = cancelled ÷ (confirmed + cancelled) by count, filter range.
+- **Weekly revenue chart** = confirmed value per Saturday-start week, last 6
+  weeks from the loaded window; the current (partial) week is drawn lighter.
+- **Rejected: "confirmed, not delivered" from `delivery_count`** — Odoo
+  creates the delivery order at confirmation, so `delivery_count` counts
+  pickings created, NOT goods delivered; it cannot measure fulfillment.
+  Needs a real delivery-state field from Odoo first.
+
 ## Month pace / attainment (Overview)
 - `attain = revMonth / MONTHLY_REVENUE_TARGET`.
 - `pace = revMonth / dayOfMonth × daysInMonth` — naive **linear** extrapolation;
