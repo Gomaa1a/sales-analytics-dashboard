@@ -42,6 +42,27 @@
       ov_orders_day: "الطلبات لكل يوم",
       ov_not_confirmed: "ملغي / غير مؤكد",
       ov_total_incl: "الإجمالي كما في أودو",
+      // overview v2
+      ov_vs_typical: "عن معدل نفس اليوم (٤ أسابيع)",
+      ov_stuck: "أقدم من ٣ أيام",
+      ov_today_orders: "طلبات اليوم",
+      ex_vs_lmtd: "مقارنة بنفس الأيام من الشهر الماضي",
+      dso_title: "أعمار ذمم العملاء",
+      dso_le30: "≤٣٠ يوم",
+      dso_gt60: ">٦٠ يوم",
+      credit_exposure: "الانكشاف الائتماني الكلي",
+      cancel_rate: "نسبة الإلغاء",
+      conc10: "حصة أكبر ١٠ عملاء",
+      of_period_rev: "من إيراد الفترة",
+      wk_rev_title: "الإيراد الأسبوعي المؤكد (آخر ٦ أسابيع)",
+      wk_partial: "أسبوع جارٍ",
+      transit_title: "نقد بالطريق — من يحمله الآن؟",
+      col_holder: "الحامل (دفتر اليومية)",
+      col_oldest: "أقدم دفعة",
+      col_risky: "طلبات حرجة",
+      col_transit: "بالطريق",
+      days_word: "يوم",
+      as_of_snapshot: "حسب آخر لقطة",
       ov_top_govs: "أعلى المحافظات (قيمة)",
       ov_customers: "عدد العملاء",
       ov_status_mix: "توزيع حالات الطلبات",
@@ -262,6 +283,27 @@
       ov_orders_day: "Orders per day",
       ov_not_confirmed: "Cancelled / unconfirmed",
       ov_total_incl: "Total (as in Odoo)",
+      // overview v2
+      ov_vs_typical: "vs 4-week same-weekday avg",
+      ov_stuck: "older than 3 days",
+      ov_today_orders: "Orders today",
+      ex_vs_lmtd: "vs same days last month",
+      dso_title: "Receivables age (customers)",
+      dso_le30: "≤30d",
+      dso_gt60: ">60d",
+      credit_exposure: "Total credit exposure",
+      cancel_rate: "Cancel rate",
+      conc10: "Top-10 customer share",
+      of_period_rev: "of period revenue",
+      wk_rev_title: "Weekly confirmed revenue (last 6 weeks)",
+      wk_partial: "current week",
+      transit_title: "Cash in transit — who holds it now?",
+      col_holder: "Holder (journal)",
+      col_oldest: "Oldest payment",
+      col_risky: "Critical orders",
+      col_transit: "In transit",
+      days_word: "days",
+      as_of_snapshot: "as of latest snapshot",
       ov_top_govs: "Top governorates (value)",
       ov_customers: "Customers",
       ov_status_mix: "Order status mix",
@@ -502,6 +544,17 @@
     const d = new Date(str.includes("T") ? str : str.replace(" ", "T") + "Z");
     if (isNaN(d)) return str.slice(0, 10);
     return d.toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" });
+  }
+  // Pure date-string arithmetic on "YYYY-MM-DD" (no timezone surprises).
+  function addDays(dstr, n) {
+    const d = new Date(dstr + "T00:00:00Z");
+    d.setUTCDate(d.getUTCDate() + n);
+    return d.toISOString().slice(0, 10);
+  }
+  // Saturday-start week (Iraq convention) for a "YYYY-MM-DD" day.
+  function weekStartSat(dstr) {
+    const d = new Date(dstr + "T00:00:00Z");
+    return addDays(dstr, -((d.getUTCDay() + 1) % 7));
   }
   function fmtDate(s) {
     if (!s) return "—";
@@ -1060,7 +1113,7 @@
     fmtNum, fmtMoney, fmtMoneyFull, fmtDate, fmtTime,
     api, ackAlert, beep, toast, notify, buildChrome, setUpdated, renderSoundBtn,
     stateLabel, trustLabel, filterBar,
-    govOf, govLabel, GOV, loadOrders, loadPayments, sbGetAll, sbWrite, nextDay, bagDay,
+    govOf, govLabel, GOV, loadOrders, loadPayments, sbGetAll, sbWrite, nextDay, bagDay, addDays, weekStartSat,
     cfg: CFG
   };
 })();
