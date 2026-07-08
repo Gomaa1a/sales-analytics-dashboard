@@ -925,7 +925,19 @@
     // Typos: كؤكوك = كركوك (Kirkuk) · ارييل = اربيل (Erbil)
     "كؤكوك": "kirkuk", "ارييل": "erbil",
     // Anbar (free-text landmark; rep territory is 100% Anbar)
-    "قرب جامع الزبير ابن العوام": "anbar"
+    "قرب جامع الزبير ابن العوام": "anbar",
+    // ---- 2026-07-08 additions: new unmapped values in live data, assigned
+    // from the customer name itself (it contains the district/governorate)
+    // cross-checked with the owning rep's territory ----
+    // Basra (customer strings say "البصرة" explicitly; rep is 63% Basra)
+    "داكير": "basra", "بريهة": "basra", "المطيحة": "basra",
+    // Kirkuk — typo of كركوك (customer "مخزن أدريس / كركوك", rep 98% Kirkuk)
+    "كركزك": "kirkuk",
+    // Baghdad — المشاهدة is in Tarmiyah district, Baghdad governorate
+    // (customer string says "طارمية")
+    "المشاهدة": "baghdad",
+    // Nineveh (customer "أسواق الشكره/القوسيات/الموصل", rep 100% Nineveh)
+    "القوسيات": "nineveh"
   };
   // Normalize a messy free-text Arabic city string so more values match:
   // strip diacritics/tatweel, unify alef/ya/hamza/ta-marbuta spellings, collapse
