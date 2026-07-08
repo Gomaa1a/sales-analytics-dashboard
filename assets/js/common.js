@@ -40,7 +40,8 @@
       ov_sub: "ملخص عالي المستوى — استخدم البحث لتحديث كل البيانات",
       ov_confirmed: "الطلبات المؤكدة",
       ov_orders_day: "الطلبات لكل يوم",
-      ov_not_confirmed: "ملغي / غير مؤكد",
+      ov_not_confirmed: "ملغي",
+      ov_quotes: "عروض أسعار",
       ov_total_incl: "الإجمالي كما في أودو",
       // overview v2
       ov_vs_typical: "عن معدل نفس اليوم (٤ أسابيع)",
@@ -281,7 +282,8 @@
       ov_sub: "High-level summary — use search to update all data",
       ov_confirmed: "Confirmed orders",
       ov_orders_day: "Orders per day",
-      ov_not_confirmed: "Cancelled / unconfirmed",
+      ov_not_confirmed: "Cancelled",
+      ov_quotes: "Quotations",
       ov_total_incl: "Total (as in Odoo)",
       // overview v2
       ov_vs_typical: "vs 4-week same-weekday avg",

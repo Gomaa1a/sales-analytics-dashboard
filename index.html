@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Sales Command Center</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=28" />
+  <link rel="stylesheet" href="assets/css/style.css?v=29" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -82,9 +82,9 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=28"></script>
-  <script src="assets/js/auth.js?v=28"></script>
-  <script src="assets/js/common.js?v=28"></script>
+  <script src="assets/js/config.js?v=29"></script>
+  <script src="assets/js/auth.js?v=29"></script>
+  <script src="assets/js/common.js?v=29"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -187,6 +187,8 @@
       const rangeRows = allRows.filter(o => { const d = dayOf(o); return d >= from && d <= to && matchRC(o); });
       const rConf = rangeRows.filter(isConf);
       const rCancel = rangeRows.filter(o => o.state === "cancel");
+      const rQuote = rangeRows.filter(o => o.state === "draft" || o.state === "sent");
+      const rQuoteVal = rQuote.reduce((s, o) => s + val(o), 0);
       const rConfVal = rConf.reduce((s, o) => s + val(o), 0);
       const rCancelVal = rCancel.reduce((s, o) => s + val(o), 0);
       const customers = new Set(rConf.map(o => o.partner_name).filter(Boolean)).size;
@@ -314,6 +316,8 @@
 
       document.getElementById("execMini").innerHTML =
         mini(D.t("ov_confirmed"), D.fmtNum(rConf.length), D.fmtMoney(rConfVal)) +
+        mini(D.t("ov_quotes"), D.fmtNum(rQuote.length),
+          rQuote.length ? D.fmtMoney(rQuoteVal) : "&nbsp;") +
         mini(D.t("ov_customers"), D.fmtNum(customers), `${from} → ${to}`) +
         mini(D.t("ov_cancelled"), D.fmtNum(rCancel.length),
           rCancel.length ? `${D.t("cancel_rate")}: <b>${cancelRate}%</b> · ${D.fmtMoney(rCancelVal)}` : "&nbsp;") +
@@ -480,15 +484,19 @@
     }
 
     function drawByDay(rows) {
-      // Stacked: confirmed (blue) + cancelled/unconfirmed (grey), bucketed by
-      // Baghdad day. The bar TOTAL matches Odoo's grouped Orders list (which
-      // counts every record), while the blue segment remains the only thing
-      // any KPI/total ever counts (hard rule: cancelled is never a sale).
+      // Stacked: confirmed (blue) + quotations (amber) + cancelled (grey),
+      // bucketed by Baghdad day. The bar TOTAL matches Odoo's grouped Orders
+      // list (which counts every record), while the blue segment remains the
+      // only thing any KPI/total ever counts (hard rule: quotations and
+      // cancelled are never sales).
+      const isQuote = o => o.state === "draft" || o.state === "sent";
       const m = {};
       rows.forEach(o => {
         const d = dayOf(o); if (!d) return;
-        if (!m[d]) m[d] = { conf: 0, value: 0, other: 0 };
-        if (isConf(o)) { m[d].conf++; m[d].value += val(o); } else { m[d].other++; }
+        if (!m[d]) m[d] = { conf: 0, value: 0, quote: 0, cancel: 0 };
+        if (isConf(o)) { m[d].conf++; m[d].value += val(o); }
+        else if (isQuote(o)) m[d].quote++;
+        else m[d].cancel++;
       });
       const days = Object.keys(m).sort();
       const ctx = document.getElementById("dayChart");
@@ -498,17 +506,22 @@
         data: { labels: days.map(d => d.slice(8, 10) + "/" + d.slice(5, 7)), datasets: [
           { label: D.t("ov_confirmed"), data: days.map(d => m[d].conf),
             backgroundColor: "#2563eb", borderRadius: 5, maxBarThickness: 34 },
-          { label: D.t("ov_not_confirmed"), data: days.map(d => m[d].other),
+          { label: D.t("ov_quotes"), data: days.map(d => m[d].quote),
+            backgroundColor: "#f59e0b", borderRadius: 5, maxBarThickness: 34 },
+          { label: D.t("ov_not_confirmed"), data: days.map(d => m[d].cancel),
             backgroundColor: "#cbd5e1", borderRadius: 5, maxBarThickness: 34 }
         ] },
         options: { maintainAspectRatio: false,
           plugins: { legend: { display: true, position: "bottom" }, tooltip: { callbacks: {
-            label: c => c.datasetIndex === 0
-              ? `${D.t("ov_confirmed")}: ${D.fmtNum(c.parsed.y)} ${D.t("orders")} · ${D.fmtMoney(m[days[c.dataIndex]].value)}`
-              : `${D.t("ov_not_confirmed")}: ${D.fmtNum(c.parsed.y)}`,
+            label: c => {
+              const b = m[days[c.dataIndex]];
+              if (c.datasetIndex === 0) return `${D.t("ov_confirmed")}: ${D.fmtNum(b.conf)} ${D.t("orders")} · ${D.fmtMoney(b.value)}`;
+              if (c.datasetIndex === 1) return `${D.t("ov_quotes")}: ${D.fmtNum(b.quote)}`;
+              return `${D.t("ov_not_confirmed")}: ${D.fmtNum(b.cancel)}`;
+            },
             footer: items => {
               const b = m[days[items[0].dataIndex]];
-              return `${D.t("ov_total_incl")}: ${D.fmtNum(b.conf + b.other)}`;
+              return `${D.t("ov_total_incl")}: ${D.fmtNum(b.conf + b.quote + b.cancel)}`;
             } } } },
           scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } } } }
       });

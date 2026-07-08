@@ -25,6 +25,11 @@
   `delivery_count` — Odoo counts pickings created at confirmation, not goods
   delivered; the number would lie (see METRICS.md).
 
+### Added — quotations visibility
+- "Orders per day" is now a 3-way stack: confirmed (blue) + **quotations
+  draft/sent (amber)** + cancelled (grey); bar totals still match Odoo.
+- New "Quotations" mini (count + value for the filter range).
+
 ### Docs
 - **`docs/N8N_AUDIT.md`** — full audit of the n8n sync with proofs: snapshot
   reads silently truncated at Supabase's 1,000-row cap (summary says 964 July

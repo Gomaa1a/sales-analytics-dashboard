@@ -1,14 +1,14 @@
 /* ============================================================
-   Dabboos Sales Command Center â€” service worker (PWA)
+   Dabboos Sales Command Center — service worker (PWA)
    Keep VERSION in sync with the ?v=NN cache-buster in the HTML
    files: bumping it here drops every old cache on next visit.
 
    Strategy:
-     â€¢ Supabase (data + auth)  â†’ NEVER intercepted. Numbers must be live.
-     â€¢ Same-origin app shell   â†’ network-first, cache fallback (offline).
-     â€¢ CDN assets (Chart.jsâ€¦)  â†’ cache-first (URLs are versioned).
+     - Supabase (data + auth)  -> NEVER intercepted. Numbers must be live.
+     - Same-origin app shell   -> network-first, cache fallback (offline).
+     - CDN assets (Chart.js)   -> cache-first (URLs are versioned).
    ============================================================ */
-const VERSION = "v28";
+const VERSION = "v29";
 const CACHE = "dabboos-" + VERSION;
 
 self.addEventListener("install", () => {
@@ -29,7 +29,7 @@ self.addEventListener("fetch", (e) => {
   if (req.method !== "GET") return;
   const url = new URL(req.url);
 
-  // The dashboard's whole point is trustworthy live numbers â€” data and
+  // The dashboard's whole point is trustworthy live numbers — data and
   // auth calls go straight to the network, always.
   if (url.hostname.endsWith(".supabase.co")) return;
 
