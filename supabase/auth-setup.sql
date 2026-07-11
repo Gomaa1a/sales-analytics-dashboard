@@ -124,7 +124,7 @@ begin
     where schemaname = 'public'
       and tablename in ('dashboard_orders', 'dashboard_payments',
                         'dashboard_snapshots', 'alert_acks',
-                        'dash_users', 'page_views')
+                        'dash_users', 'page_views', 'salespeople')
   loop
     execute format('drop policy %I on public.%I', p.policyname, p.tablename);
   end loop;

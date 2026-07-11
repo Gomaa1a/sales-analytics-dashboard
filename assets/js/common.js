@@ -605,17 +605,125 @@
     return res.status === 204 ? null : res.json();
   }
 
-  async function snapshot(key) {
-    const rows = await sbGet(`${CFG.TABLES.snapshots}?select=data&key=eq.${key}`);
-    if (!rows || !rows.length) throw new Error("snapshot missing: " + key);
-    return rows[0].data;
+  /* ---------------- raw-table adapters ----------------
+     These used to be n8n-computed snapshots. They are now built in the
+     browser from the raw tables, in the SAME return shapes, so the pages
+     that consume them did not change. Raw tables are the single source of
+     truth — every number here can be traced to rows you can inspect. */
+
+  const bagToday = () => bagDay(new Date().toISOString());
+
+  // 14-day per-rep collections grid (paid vs in_process), from dashboard_payments.
+  async function buildRepCollections() {
+    const today = bagToday();
+    const from = addDays(today, -13);
+    const rows = dedupeBy(await sbGetAll(
+      `dashboard_payments?select=payment_id,date,amount,state,salesperson,user_id&date=gte.${from}&state=neq.canceled&order=date.desc`), "payment_id");
+    const days = [];
+    for (let i = 13; i >= 0; i--) days.push(addDays(today, -i));
+    const reps = new Map();
+    const totals = {};
+    days.forEach(d => { totals[d] = { paid: 0, pending: 0, total: 0 }; });
+    let grandPaid = 0, grandPending = 0;
+    for (const p of rows) {
+      const day = String(p.date).slice(0, 10);
+      if (!totals[day]) continue;
+      const amt = Number(p.amount) || 0;
+      const paid = p.state === "paid" ? amt : 0;
+      const pend = p.state === "in_process" ? amt : 0;
+      if (!paid && !pend) continue; // ignore draft/other states
+      const key = p.user_id != null ? p.user_id : (p.salesperson || "—");
+      if (!reps.has(key)) reps.set(key, {
+        user_id: p.user_id != null ? p.user_id : null, salesperson: p.salesperson || "—",
+        paid_total: 0, pending_total: 0, total: 0, count: 0,
+        daily: Object.fromEntries(days.map(d => [d, { paid: 0, pending: 0, total: 0, count: 0 }]))
+      });
+      const r = reps.get(key);
+      r.paid_total += paid; r.pending_total += pend; r.total += paid + pend; r.count++;
+      const cell = r.daily[day];
+      cell.paid += paid; cell.pending += pend; cell.total += paid + pend; cell.count++;
+      totals[day].paid += paid; totals[day].pending += pend; totals[day].total += paid + pend;
+      grandPaid += paid; grandPending += pend;
+    }
+    const repList = [...reps.values()]
+      .map(r => ({ ...r, today: r.daily[today] || { paid: 0, pending: 0, total: 0, count: 0 } }))
+      .sort((a, b) => (b.today.total - a.today.total) || (b.total - a.total));
+    return { generated_at: new Date().toISOString(), currency: CFG.CURRENCY, today, days,
+      reps: repList, totals_by_day: totals, grand_paid: grandPaid, grand_pending: grandPending,
+      grand_total: grandPaid + grandPending };
+  }
+
+  // Debtors grouped by assigned rep, from the dashboard_customers master.
+  async function buildRepDebt() {
+    const rows = await sbGetAll(
+      `dashboard_customers?select=partner_id,complete_name,city,credit,vt_overdue_amount,user_id,salesperson` +
+      `&or=(credit.gt.0,vt_overdue_amount.gt.0)&order=credit.desc`);
+    const reps = new Map();
+    for (const c of rows) {
+      const key = c.user_id != null ? c.user_id : (c.salesperson || "—");
+      if (!reps.has(key)) reps.set(key, {
+        user_id: c.user_id != null ? c.user_id : null,
+        salesperson: c.salesperson || "— غير محدد / Unassigned",
+        customers: [], receivable_total: 0, overdue_total: 0
+      });
+      const r = reps.get(key);
+      const rec = Number(c.credit) || 0, ov = Number(c.vt_overdue_amount) || 0;
+      r.customers.push({ name: c.complete_name || "—", city: c.city || "", receivable: rec, overdue: ov });
+      r.receivable_total += rec; r.overdue_total += ov;
+    }
+    const repList = [...reps.values()]
+      .map(r => ({ ...r, customer_count: r.customers.length,
+        customers: r.customers.sort((a, b) => b.receivable - a.receivable) }))
+      .sort((a, b) => b.receivable_total - a.receivable_total);
+    return { generated_at: new Date().toISOString(), currency: CFG.CURRENCY, reps: repList,
+      grand_receivable: repList.reduce((s, r) => s + r.receivable_total, 0),
+      grand_overdue: repList.reduce((s, r) => s + r.overdue_total, 0),
+      customers_total: repList.reduce((s, r) => s + r.customer_count, 0) };
+  }
+
+  // Receivables health: aging, exposure, top overdue (customers master) +
+  // uninvoiced and new-risk (orders). Bases documented in docs/METRICS.md.
+  async function buildCollections() {
+    const today = bagToday();
+    const since95 = addDays(today, -95);
+    const monthStart = today.slice(0, 7) + "-01";
+    const [custs, uninvRaw, riskRaw] = await Promise.all([
+      sbGetAll(`dashboard_customers?select=complete_name,credit,credit_limit,vt_overdue_amount,days_sales_outstanding,trust` +
+               `&or=(credit.gt.0,vt_overdue_amount.gt.0)`),
+      sbGetAll(`${CFG.TABLES.orders}?select=order_id,amount_total&state=in.(sale,done)&invoice_count=eq.0&date_order=gte.${since95}`),
+      sbGetAll(`${CFG.TABLES.orders}?select=order_id,amount_total&state=in.(sale,done)&level=eq.critical&date_order=gte.${monthStart}`)
+    ]);
+    const uninv = dedupeBy(uninvRaw, "order_id");
+    const risk = dedupeBy(riskRaw, "order_id");
+    const num2 = n => Number(n) || 0;
+    const dso_buckets = { le30: 0, b31_60: 0, gt60: 0, unknown: 0 };
+    custs.forEach(c => {
+      const d = c.days_sales_outstanding;
+      if (d == null || d === false) dso_buckets.unknown++;
+      else if (d > 60) dso_buckets.gt60++;
+      else if (d > 30) dso_buckets.b31_60++;
+      else dso_buckets.le30++;
+    });
+    const overdue_customers = custs.filter(c => num2(c.vt_overdue_amount) > 0)
+      .map(c => ({ name: c.complete_name, overdue: num2(c.vt_overdue_amount), dso: c.days_sales_outstanding }))
+      .sort((a, b) => b.overdue - a.overdue).slice(0, 8);
+    const sumV = a => a.reduce((s, o) => s + num2(o.amount_total), 0);
+    return {
+      generated_at: new Date().toISOString(), currency: CFG.CURRENCY,
+      customers_evaluated: custs.length,
+      overdue_total: custs.reduce((s, c) => s + num2(c.vt_overdue_amount), 0),
+      credit_exposure: custs.reduce((s, c) => s + num2(c.credit), 0),
+      dso_buckets, overdue_customers,
+      uninvoiced_value: sumV(uninv), uninvoiced_count: uninv.length,
+      new_risk_value: sumV(risk), new_risk_count: risk.length
+    };
   }
 
   async function api(endpointKey, params) {
-    // Snapshot-backed endpoints (n8n writes these to dashboard_snapshots).
-    if (endpointKey === "collections" || endpointKey === "rep_collections" || endpointKey === "rep_debt") {
-      return snapshot(endpointKey);
-    }
+    // Raw-table adapters (used to be n8n snapshots — see docs/ARCHITECTURE.md).
+    if (endpointKey === "rep_collections") return buildRepCollections();
+    if (endpointKey === "rep_debt") return buildRepDebt();
+    if (endpointKey === "collections") return buildCollections();
 
     if (endpointKey === "acks") {
       const rows = await sbGet(`alert_acks?select=order_id,order_name,level,amount_total,note,created_at&order=created_at.desc&limit=2000`);

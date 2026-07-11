@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-07-11 — Raw-tables restructure: n8n is a fetcher, snapshots retired
+
+- **Architecture:** Odoo → n8n (fetch-only) → relational Supabase tables →
+  dashboard queries. No n8n-computed snapshots/summaries anywhere — every
+  aggregate is computed in the browser from rows that can be audited
+  against Odoo one-by-one.
+- **Schema** (`supabase/restructure.sql`): new `salespeople` table (user_id
+  PK — one spelling per rep, backfilled from orders+payments);
+  `dashboard_customers` gains the assigned rep (user_id FK); orders gain
+  `partner_id` FK; `date_order`/`create_date` become timestamptz and
+  payments `date` a real date; indexes for all polling queries; RLS for the
+  new table.
+- **n8n v4** ("Dabboos Sync v4 — raw only"): all snapshot-builder nodes
+  deleted; FK-safe upsert order (salespeople → customers → orders); hourly
+  full pull now fills the `dashboard_customers` MASTER (all real customers,
+  with assigned rep); includes all v3/v3.1 fixes (write_date fetch, states
+  heal, false→null, pagination irrelevant now).
+- **Dashboard:** `D.api("rep_debt"/"collections"/"rep_collections")` are now
+  raw-table adapters returning the same shapes — Debt, Collections and
+  Overview pages unchanged by design. Bases documented in METRICS.md
+  (aging/exposure now cover ALL owing customers, not just recently-seen).
+- Cache-bust v=30. ARCHITECTURE.md rewritten. Cutover order documented in
+  restructure.sql (SQL → n8n v4 + backfill → deploy → retire snapshots).
+
 ## 2026-07-08 — Overview v2: business-owner metrics (audit-driven)
 
 ### Fixed

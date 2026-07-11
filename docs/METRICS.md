@@ -72,9 +72,22 @@ period collections by period **confirmed order value** (tax-inclusive) — a
 rough liquidity signal, not an accounting figure.
 
 ## Overdue / Receivable (Debt page)
-Point-in-time balances from the `rep_debt` snapshot (`receivable`, `overdue`
-per customer). **The date filter does not apply** — it's "as of now." "Debt
+Point-in-time balances per customer from the **`dashboard_customers` master
+table** (`credit` = receivable, `vt_overdue_amount` = overdue), grouped by the
+customer's **assigned rep** (`res.partner.user_id`). **The date filter does
+not apply** — it's "as of the last hourly customer sync." "Debt
 concentration" = top-10 debtors' share of total overdue.
+
+## Raw-table adapter bases (2026-07 restructure — snapshots retired)
+- **14-day collections grid** = `dashboard_payments` rows of the last 14
+  Baghdad days; paid = state `paid`, pending = state `in_process`.
+- **DSO aging buckets / credit exposure / top overdue** = ALL customers in
+  the master with `credit > 0` or overdue `> 0` (previously: only customers
+  seen in the last 30 days of orders — the new basis is broader and honest).
+- **Uninvoiced** = confirmed orders of the last 95 days with
+  `invoice_count = 0` (same window the old snapshot used).
+- **New risk** = this month's confirmed orders with `level = critical`
+  (previously a near-identical customer-flag rule computed in n8n).
 
 ## DSO (Days Sales Outstanding)
 `receivable / thisMonthConfirmedSales × 30`. A **rough proxy** only: it mixes a

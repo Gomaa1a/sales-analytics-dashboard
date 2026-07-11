@@ -66,6 +66,17 @@ client-side, so the UI counts each order once even if the table has duplicates.
 duplicates never land in the table. Verify with
 `select count(*), count(distinct order_id) from dashboard_orders;`.
 
+## 4b. ✅ Snapshot pipeline retired (FIXED 2026-07-11)
+All n8n-computed snapshots/summaries (`rep_debt`, `rep_collections`,
+`collections`, plus the never-used `summary`/`trends`/`reps`/`regions`/
+`salespeople`) are replaced by raw-table adapters in `common.js` — every
+aggregate is now computed from rows that can be checked against Odoo
+directly. This closes the whole class of snapshot bugs found in
+`docs/N8N_AUDIT.md` (1,000-row truncation, UTC/Baghdad mixing, staleness).
+Schema is relational now (`supabase/restructure.sql`: `salespeople` +
+FKs + timestamptz). Drop `dashboard_snapshots`/`dashboard_monthly` after a
+week of clean v4 operation.
+
 ## 5. 🔴 Full-window polling re-downloads everything every 60s
 `sbGetAll()` pulls the entire orders + payments window on every poll, on every
 page, in every open tab — no delta, no cache. Fine now; costly as data grows.
