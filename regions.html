@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Cities & Governorates</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=30" />
+  <link rel="stylesheet" href="assets/css/style.css?v=31" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -52,9 +52,9 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=30"></script>
-  <script src="assets/js/auth.js?v=30"></script>
-  <script src="assets/js/common.js?v=30"></script>
+  <script src="assets/js/config.js?v=31"></script>
+  <script src="assets/js/auth.js?v=31"></script>
+  <script src="assets/js/common.js?v=31"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -99,14 +99,19 @@
 
     async function loadWindow(from, to) {
       try {
+        // dashboard_customers(governorate) = the REAL governorate from Odoo
+        // (res.partner.state_id), embedded through the orders→customers FK.
+        // Preferred when present; the free-text city dictionary is the fallback.
         const rows = await D.loadOrders({ from, to, dateField: "date_order",
-          select: "order_id,city,state,amount_total,create_date,date_order" });
+          select: "order_id,city,state,amount_total,create_date,date_order,dashboard_customers(governorate)" });
         loadedFrom = from; loadedTo = to;
         // aggregate confirmed orders by city, tagging each with its governorate
         const m = {};
         rows.filter(isConf).forEach(o => {
           const city = (o.city && o.city !== "—") ? String(o.city).trim() : "—";
-          const g = D.govOf(city);
+          const realGov = o.dashboard_customers && o.dashboard_customers.governorate
+            ? String(o.dashboard_customers.governorate).replace(/\s*\(.*?\)\s*$/, "").trim() : "";
+          const g = D.govOf(realGov || city);
           const key = g.key + "||" + city;
           if (!m[key]) m[key] = { city, govKey: g.key, govLabel: D.govLabel(g.key), orders: 0, value: 0 };
           m[key].orders++; m[key].value += val(o);

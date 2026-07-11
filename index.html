@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Sales Command Center</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=30" />
+  <link rel="stylesheet" href="assets/css/style.css?v=31" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -23,9 +23,11 @@
     <div class="filters" id="fbHost"></div>
 
     <!-- Row 1 — TODAY: how is the day going? (always anchored to today) -->
+    <h2 class="sect-h" id="secToday"></h2>
     <div id="todayKpis" class="kpi-grid"></div>
 
     <!-- Row 2 — THE MONTH: sales vs target · cash · overdue · uninvoiced -->
+    <h2 class="sect-h" id="secMonth"></h2>
     <section class="exec">
       <div class="exec-heads" id="execHeads"></div>
       <div class="exec-mini" id="execMini"></div>
@@ -43,6 +45,7 @@
     </section>
 
     <!-- Row 3 — NAMES: who to call, who is performing -->
+    <h2 class="sect-h" id="secNames"></h2>
     <div class="grid-2">
       <div class="panel">
         <div class="panel-head"><h2 id="debtorsTitle"></h2></div>
@@ -55,6 +58,7 @@
     </div>
 
     <!-- Row 4 — RHYTHM: daily pulse + weekly trajectory -->
+    <h2 class="sect-h" id="secRhythm"></h2>
     <div class="grid-2">
       <div class="panel">
         <div class="panel-head"><h2 id="dayTitle"></h2></div>
@@ -67,6 +71,7 @@
     </div>
 
     <!-- Row 5 — WHO: customer dependency + cash physically in transit -->
+    <h2 class="sect-h" id="secWho"></h2>
     <div class="grid-2">
       <div class="panel">
         <div class="panel-head"><h2 id="custTitle"></h2></div>
@@ -82,9 +87,9 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=30"></script>
-  <script src="assets/js/auth.js?v=30"></script>
-  <script src="assets/js/common.js?v=30"></script>
+  <script src="assets/js/config.js?v=31"></script>
+  <script src="assets/js/auth.js?v=31"></script>
+  <script src="assets/js/common.js?v=31"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -99,6 +104,11 @@
     document.getElementById("leaderTitle").textContent = D.t("ov_leaderboard");
     document.getElementById("storyLbl").textContent = D.t("ex_story");
     document.getElementById("varLbl").textContent = D.t("ex_var");
+    document.getElementById("secToday").textContent = D.t("sec_today");
+    document.getElementById("secMonth").textContent = D.t("sec_month");
+    document.getElementById("secNames").textContent = D.t("sec_names");
+    document.getElementById("secRhythm").textContent = D.t("sec_rhythm");
+    document.getElementById("secWho").textContent = D.t("sec_who");
 
     const isConf = o => o.state === "sale" || o.state === "done";
     const val = o => Number(o.amount_total) || 0;
@@ -223,9 +233,6 @@
       const salesToday = salesTodayRows.reduce((s, o) => s + val(o), 0);
       const cashTodayRows = paysRC.filter(p => String(p.date).slice(0, 10) === today);
       const cashToday = cashTodayRows.reduce((s, p) => s + num(p.amount), 0);
-      const pendRows = paysRC.filter(p => p.state === "in_process");
-      const pendCash = pendRows.reduce((s, p) => s + num(p.amount), 0);
-
       // benchmark: average of the last 4 same weekdays (the loaded window
       // always covers today-28 because it starts at last month's 1st)
       const sumOn = (rows, d, getD, getV) => rows.filter(r => getD(r) === d).reduce((s, r) => s + getV(r), 0);
@@ -242,21 +249,15 @@
       const typSales = typAvg(confAll, dayOf, val);
       const typCash = typAvg(paysRC, p => String(p.date).slice(0, 10), p => num(p.amount));
 
-      // cash sitting with couriers for more than 3 days = leakage risk
-      const cut3 = D.addDays(today, -3);
-      const stuck = pendRows.filter(p => String(p.date).slice(0, 10) < cut3);
-      const stuckAmt = stuck.reduce((s, p) => s + num(p.amount), 0);
       const cancelledToday = allRows.filter(o => o.state === "cancel" && dayOf(o) === today && matchRC(o)).length;
 
+      // (the "cash in process" KPI was removed by request — the per-holder
+      // in-transit panel at the bottom still covers that money)
       document.getElementById("todayKpis").innerHTML =
         kpi("", D.t("ov_today_sales"), D.fmtMoney(salesToday),
           typicalTag(salesToday, typSales) || `${D.fmtNum(salesTodayRows.length)} ${D.t("orders")} · ${today}`) +
         kpi("k-grn", D.t("coll_today"), D.fmtMoney(cashToday),
           typicalTag(cashToday, typCash) || `${D.fmtNum(cashTodayRows.length)} ${D.t("payments_count")} · ${today}`) +
-        kpi("k-amb", D.t("ov_pending_cash"), D.fmtMoney(pendCash),
-          stuck.length
-            ? `<span class="danger">⚠ ${D.fmtNum(stuck.length)} ${D.t("ov_stuck")} · ${D.fmtMoney(stuckAmt)}</span>`
-            : `${D.fmtNum(pendRows.length)} ${D.t("payments_count")}`) +
         kpi("k-vio", D.t("ov_today_orders"), D.fmtNum(salesTodayRows.length),
           cancelledToday ? `${D.fmtNum(cancelledToday)} ${D.stateLabel("cancel")}` : "&nbsp;");
 
@@ -302,7 +303,16 @@
           `<div class="ex-sub" style="margin-top:9px">${collSnap ? `${D.fmtNum(collSnap.uninvoiced_count)} ${D.t("orders")}` : "&nbsp;"}</div></div>`;
 
       // ----- minis (filter-range) -----
-      const govAgg = {}; let govTotal = 0; rConf.forEach(o => { const g = D.govLabel(D.govOf(o.city).key); govAgg[g] = (govAgg[g] || 0) + val(o); govTotal += val(o); });
+      // "Top governorate" only considers REAL governorates — a missing city in
+      // Odoo must never be crowned the top region ("No city 23%" is noise).
+      const govAgg = {}; let govTotal = 0;
+      rConf.forEach(o => {
+        const k = D.govOf(o.city).key;
+        govTotal += val(o);
+        if (k === "nocity" || k === "unknown") return;
+        const g = D.govLabel(k);
+        govAgg[g] = (govAgg[g] || 0) + val(o);
+      });
       const topGov = Object.entries(govAgg).sort((a, b) => b[1] - a[1])[0];
       const govShare = (topGov && govTotal > 0) ? Math.round(topGov[1] / govTotal * 100) : 0;
 

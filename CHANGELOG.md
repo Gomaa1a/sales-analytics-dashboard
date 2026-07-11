@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-07-11 — Real governorate + Overview story headings
+
+- **Real governorate from Odoo** (`res.partner.state_id`): n8n v4.1 syncs it
+  into `dashboard_customers.governorate` (`supabase/add-governorate.sql`);
+  the Regions page embeds it through the orders→customers FK and prefers it,
+  falling back to the free-text city dictionary only when empty. `govOf()`
+  also recognizes English governorate names. This is the durable fix for the
+  "Unknown / بدون مدينة" buckets — coverage grows as the field fills in Odoo.
+- **Overview decluttered** (by request): removed the "Cash in process (held
+  by reps)" KPI (the per-holder in-transit panel remains); the placeholder
+  900M target is now 0 → the misleading "% of target / on pace" bar is hidden
+  until a real target exists (ideally synced from Odoo's salesperson.target);
+  "Top governorate" now ignores no-city/unknown buckets so "No city" can
+  never be crowned the top region.
+- **Story headings on the Overview**: five numbered questions (AR/EN) that
+  make the page read top-to-bottom as a narrative — Today: how is the day
+  going? · The month: are we on track? · Names: who do we call? · Rhythm:
+  which way are we trending? · Cash & customers: who holds our money?
+- Cache-bust v=31.
+
 ## 2026-07-11 — Raw-tables restructure: n8n is a fetcher, snapshots retired
 
 - **Architecture:** Odoo → n8n (fetch-only) → relational Supabase tables →

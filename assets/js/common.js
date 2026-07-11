@@ -44,6 +44,12 @@
       ov_quotes: "عروض أسعار",
       ov_total_incl: "الإجمالي كما في أودو",
       // overview v2
+      // overview story headings — the question each row answers, in reading order
+      sec_today: "١ · اليوم — كيف يسير يومنا؟",
+      sec_month: "٢ · الشهر — هل نحن على المسار؟",
+      sec_names: "٣ · الأسماء — بمن نتصل اليوم؟",
+      sec_rhythm: "٤ · الإيقاع — إلى أين نتجه؟",
+      sec_who: "٥ · النقد والعملاء — من يحمل أموالنا الآن؟",
       ov_vs_typical: "عن معدل نفس اليوم (٤ أسابيع)",
       ov_stuck: "أقدم من ٣ أيام",
       ov_today_orders: "طلبات اليوم",
@@ -286,6 +292,12 @@
       ov_quotes: "Quotations",
       ov_total_incl: "Total (as in Odoo)",
       // overview v2
+      // overview story headings — the question each row answers, in reading order
+      sec_today: "1 · Today — how is the day going?",
+      sec_month: "2 · The month — are we on track?",
+      sec_names: "3 · Names — who do we call today?",
+      sec_rhythm: "4 · Rhythm — which way are we trending?",
+      sec_who: "5 · Cash & customers — who holds our money right now?",
       ov_vs_typical: "vs 4-week same-weekday avg",
       ov_stuck: "older than 3 days",
       ov_today_orders: "Orders today",
@@ -1126,10 +1138,16 @@
   const CITY2GOV_N = {};
   Object.keys(CITY2GOV).forEach(k => { const nk = normCity(k); if (nk) CITY2GOV_N[nk] = CITY2GOV[k]; });
   Object.keys(GOV).forEach(code => { if (code === "unknown" || code === "nocity") return; const nk = normCity(GOV[code].ar); if (nk && !CITY2GOV_N[nk]) CITY2GOV_N[nk] = code; });
+  // English governorate names too — Odoo's res.country.state may store them in
+  // English ("Baghdad"), and the real governorate field routes through govOf().
+  const GOV_EN2CODE = {};
+  Object.keys(GOV).forEach(code => { if (code === "unknown" || code === "nocity") return; GOV_EN2CODE[GOV[code].en.toLowerCase()] = code; });
   function govResult(code) { return { key: code, ar: GOV[code].ar, en: GOV[code].en }; }
   function govOf(city) {
     const raw = (city == null ? "" : String(city)).trim();
     if (!raw || raw === "—") return govResult("nocity");
+    const en = GOV_EN2CODE[raw.toLowerCase()];
+    if (en) return govResult(en);                              // English governorate name
     if (CITY2GOV[raw]) return govResult(CITY2GOV[raw]);        // exact original (fast path)
     const n = normCity(raw);
     if (n && CITY2GOV_N[n]) return govResult(CITY2GOV_N[n]);   // normalized match
