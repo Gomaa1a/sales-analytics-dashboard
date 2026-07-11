@@ -731,11 +731,25 @@
     };
   }
 
+  // The adapters aggregate thousands of rows — recomputing them on every
+  // 60-second poll multiplied the page's requests. Receivables/debt data
+  // changes hourly at most, so cache the results for a few minutes; the
+  // live numbers (orders/payments windows) still refresh every poll.
+  const apiCache = {};
+  const API_CACHE_MS = 4 * 60 * 1000;
+  async function cachedApi(key, build) {
+    const c = apiCache[key];
+    if (c && Date.now() - c.at < API_CACHE_MS) return c.data;
+    const data = await build();
+    apiCache[key] = { at: Date.now(), data: data };
+    return data;
+  }
+
   async function api(endpointKey, params) {
     // Raw-table adapters (used to be n8n snapshots — see docs/ARCHITECTURE.md).
-    if (endpointKey === "rep_collections") return buildRepCollections();
-    if (endpointKey === "rep_debt") return buildRepDebt();
-    if (endpointKey === "collections") return buildCollections();
+    if (endpointKey === "rep_collections") return cachedApi("rep_collections", buildRepCollections);
+    if (endpointKey === "rep_debt") return cachedApi("rep_debt", buildRepDebt);
+    if (endpointKey === "collections") return cachedApi("collections", buildCollections);
 
     if (endpointKey === "acks") {
       const rows = await sbGet(`alert_acks?select=order_id,order_name,level,amount_total,note,created_at&order=created_at.desc&limit=2000`);
@@ -1186,20 +1200,32 @@
     return out;
   }
   async function sbGetAll(pathAndQuery) {
+    // Supabase caps every response at 1,000 rows. Each round trip costs
+    // ~200ms from Iraq, so pages 2..N are fetched in PARALLEL: the first
+    // request also returns the exact total (Prefer: count=exact), which
+    // tells us how many more pages to launch at once. A 4-page window that
+    // took ~1.8s serially takes ~2 round trips this way.
     const base = CFG.SUPABASE_URL.replace(/\/$/, "");
-    const PAGE = 1000; let offset = 0; const out = [];
-    for (;;) {
-      const sep = pathAndQuery.includes("?") ? "&" : "?";
-      const res = await fetch(base + "/rest/v1/" + pathAndQuery + `${sep}limit=${PAGE}&offset=${offset}`, {
-        method: "GET", cache: "no-store",
-        headers: await authHeaders()
-      });
-      if (!res.ok) { authFail(res); throw new Error("Supabase HTTP " + res.status); }
-      const rows = await res.json();
-      out.push(...rows);
-      if (rows.length < PAGE) break;
-      offset += PAGE;
-      if (offset > 100000) break;
+    const PAGE = 1000;
+    const sep = pathAndQuery.includes("?") ? "&" : "?";
+    const url = o => base + "/rest/v1/" + pathAndQuery + `${sep}limit=${PAGE}&offset=${o}`;
+    const h = await authHeaders();
+    const first = await fetch(url(0), {
+      method: "GET", cache: "no-store",
+      headers: Object.assign({}, h, { Prefer: "count=exact" })
+    });
+    if (!first.ok) { authFail(first); throw new Error("Supabase HTTP " + first.status); }
+    const out = await first.json();
+    const total = Number((first.headers.get("content-range") || "").split("/")[1]);
+    if (out.length === PAGE && total > PAGE) {
+      const offsets = [];
+      for (let o = PAGE; o < Math.min(total, 100000); o += PAGE) offsets.push(o);
+      const rest = await Promise.all(offsets.map(o =>
+        fetch(url(o), { method: "GET", cache: "no-store", headers: h }).then(res => {
+          if (!res.ok) { authFail(res); throw new Error("Supabase HTTP " + res.status); }
+          return res.json();
+        })));
+      rest.forEach(rows => out.push(...rows));
     }
     return out;
   }

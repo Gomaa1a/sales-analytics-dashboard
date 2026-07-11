@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-07-11 — Performance: parallel pages, adapter cache, initplan RLS
+
+Measured causes of slowness (from Iraq: ~183ms per round trip):
+serial pagination (orders window = 4 sequential requests ≈ 1.8s), the
+raw-table adapters re-aggregating thousands of rows on EVERY 60s poll,
+and RLS policies calling dash_role() per scanned row.
+
+- `sbGetAll` now fetches page 1 with `Prefer: count=exact` and pages 2..N
+  **in parallel** — a 4-page window costs ~2 round trips instead of 4.
+- The three adapters (`rep_debt`, `collections`, `rep_collections`) are
+  cached for 4 minutes (verified: cached call = 0ms) — receivables data
+  changes hourly at most; live order/payment windows still poll every 60s.
+- **`supabase/perf-policies.sql`** (run once): rewrites every policy to the
+  `(select dash_role())` InitPlan form — role evaluated once per query
+  instead of once per row. Same security.
+- Cache-bust v=32.
+
 ## 2026-07-11 — Real governorate + Overview story headings
 
 - **Real governorate from Odoo** (`res.partner.state_id`): n8n v4.1 syncs it
