@@ -54,9 +54,10 @@
       ov_stuck: "أقدم من ٣ أيام",
       ov_today_orders: "طلبات اليوم",
       ex_vs_lmtd: "مقارنة بنفس الأيام من الشهر الماضي",
-      dso_title: "أعمار ذمم العملاء",
+      dso_title: "أعمار الذمم (فواتير مفتوحة)",
       dso_le30: "≤٣٠ يوم",
       dso_gt60: ">٦٠ يوم",
+      od_days: "أيام التأخير",
       credit_exposure: "الانكشاف الائتماني الكلي",
       cancel_rate: "نسبة الإلغاء",
       conc10: "حصة أكبر ١٠ عملاء",
@@ -302,9 +303,10 @@
       ov_stuck: "older than 3 days",
       ov_today_orders: "Orders today",
       ex_vs_lmtd: "vs same days last month",
-      dso_title: "Receivables age (customers)",
+      dso_title: "Receivables age (open invoices)",
       dso_le30: "≤30d",
       dso_gt60: ">60d",
+      od_days: "Days overdue",
       credit_exposure: "Total credit exposure",
       cancel_rate: "Cancel rate",
       conc10: "Top-10 customer share",
@@ -665,13 +667,56 @@
       grand_total: grandPaid + grandPending };
   }
 
-  // Debtors grouped by assigned rep, from the dashboard_customers master.
-  async function buildRepDebt() {
+  /* -------- debt from TRANSACTIONAL facts: open invoices --------
+     receivable = Σ unpaid residuals of posted invoices; overdue = the slice
+     whose due_date has passed. Every figure traces to invoice rows you can
+     open in Odoo. The customers master only supplies IDENTITY (name,
+     assigned rep, governorate) — its precomputed money fields are unused. */
+  async function loadOpenInvoices() {
+    return dedupeBy(await sbGetAll(
+      `dashboard_invoices?select=invoice_id,partner_id,partner_name,user_id,amount_residual,due_date` +
+      `&state=eq.posted&amount_residual=gt.0`), "invoice_id");
+  }
+  async function loadCustomerIdentity() {
     const rows = await sbGetAll(
-      `dashboard_customers?select=partner_id,complete_name,city,credit,vt_overdue_amount,user_id,salesperson` +
-      `&or=(credit.gt.0,vt_overdue_amount.gt.0)&order=credit.desc`);
+      `dashboard_customers?select=partner_id,complete_name,city,governorate,user_id,salesperson`);
+    const m = new Map();
+    rows.forEach(c => m.set(c.partner_id, c));
+    return m;
+  }
+  function debtorsFromInvoices(inv, idmap, today) {
+    const cust = new Map();
+    for (const i of inv) {
+      const pid = i.partner_id != null ? i.partner_id : "?" + (i.partner_name || "");
+      if (!cust.has(pid)) {
+        const c = idmap.get(i.partner_id) || {};
+        cust.set(pid, {
+          name: c.complete_name || i.partner_name || "—",
+          city: c.governorate || c.city || "",
+          user_id: c.user_id != null ? c.user_id : (i.user_id != null ? i.user_id : null),
+          salesperson: c.salesperson || null,
+          receivable: 0, overdue: 0, oldestLate: 0
+        });
+      }
+      const e = cust.get(pid);
+      const amt = Number(i.amount_residual) || 0;
+      e.receivable += amt;
+      const due = i.due_date ? String(i.due_date).slice(0, 10) : "";
+      if (due && due < today) {
+        e.overdue += amt;
+        const late = Math.round((Date.parse(today) - Date.parse(due)) / 864e5);
+        if (late > e.oldestLate) e.oldestLate = late;
+      }
+    }
+    return cust;
+  }
+
+  async function buildRepDebt() {
+    const today = bagToday();
+    const [inv, idmap] = await Promise.all([loadOpenInvoices(), loadCustomerIdentity()]);
+    const cust = debtorsFromInvoices(inv, idmap, today);
     const reps = new Map();
-    for (const c of rows) {
+    for (const c of cust.values()) {
       const key = c.user_id != null ? c.user_id : (c.salesperson || "—");
       if (!reps.has(key)) reps.set(key, {
         user_id: c.user_id != null ? c.user_id : null,
@@ -679,9 +724,8 @@
         customers: [], receivable_total: 0, overdue_total: 0
       });
       const r = reps.get(key);
-      const rec = Number(c.credit) || 0, ov = Number(c.vt_overdue_amount) || 0;
-      r.customers.push({ name: c.complete_name || "—", city: c.city || "", receivable: rec, overdue: ov });
-      r.receivable_total += rec; r.overdue_total += ov;
+      r.customers.push({ name: c.name, city: c.city, receivable: c.receivable, overdue: c.overdue });
+      r.receivable_total += c.receivable; r.overdue_total += c.overdue;
     }
     const repList = [...reps.values()]
       .map(r => ({ ...r, customer_count: r.customers.length,
@@ -693,38 +737,49 @@
       customers_total: repList.reduce((s, r) => s + r.customer_count, 0) };
   }
 
-  // Receivables health: aging, exposure, top overdue (customers master) +
-  // uninvoiced and new-risk (orders). Bases documented in docs/METRICS.md.
+  // Receivables health, all from OPEN INVOICES: true aging by due date
+  // (amounts, not counts), total exposure = the open book, top overdue with
+  // days-late. Uninvoiced and new-risk stay orders-based. See docs/METRICS.md.
   async function buildCollections() {
     const today = bagToday();
     const since95 = addDays(today, -95);
     const monthStart = today.slice(0, 7) + "-01";
-    const [custs, uninvRaw, riskRaw] = await Promise.all([
-      sbGetAll(`dashboard_customers?select=complete_name,credit,credit_limit,vt_overdue_amount,days_sales_outstanding,trust` +
-               `&or=(credit.gt.0,vt_overdue_amount.gt.0)`),
+    const [inv, idmap, uninvRaw, riskRaw] = await Promise.all([
+      loadOpenInvoices(),
+      loadCustomerIdentity(),
       sbGetAll(`${CFG.TABLES.orders}?select=order_id,amount_total&state=in.(sale,done)&invoice_count=eq.0&date_order=gte.${since95}`),
       sbGetAll(`${CFG.TABLES.orders}?select=order_id,amount_total&state=in.(sale,done)&level=eq.critical&date_order=gte.${monthStart}`)
     ]);
     const uninv = dedupeBy(uninvRaw, "order_id");
     const risk = dedupeBy(riskRaw, "order_id");
     const num2 = n => Number(n) || 0;
+
+    // aging buckets in IQD: le30 = not yet due or ≤30 days late,
+    // 31–60 late, >60 late, unknown = no due date on the invoice
     const dso_buckets = { le30: 0, b31_60: 0, gt60: 0, unknown: 0 };
-    custs.forEach(c => {
-      const d = c.days_sales_outstanding;
-      if (d == null || d === false) dso_buckets.unknown++;
-      else if (d > 60) dso_buckets.gt60++;
-      else if (d > 30) dso_buckets.b31_60++;
-      else dso_buckets.le30++;
+    let overdue_total = 0, exposure = 0;
+    inv.forEach(i => {
+      const amt = num2(i.amount_residual);
+      exposure += amt;
+      const due = i.due_date ? String(i.due_date).slice(0, 10) : "";
+      if (!due) { dso_buckets.unknown += amt; return; }
+      const late = Math.round((Date.parse(today) - Date.parse(due)) / 864e5);
+      if (late > 0) overdue_total += amt;
+      if (late > 60) dso_buckets.gt60 += amt;
+      else if (late > 30) dso_buckets.b31_60 += amt;
+      else dso_buckets.le30 += amt;
     });
-    const overdue_customers = custs.filter(c => num2(c.vt_overdue_amount) > 0)
-      .map(c => ({ name: c.complete_name, overdue: num2(c.vt_overdue_amount), dso: c.days_sales_outstanding }))
+    const cust = debtorsFromInvoices(inv, idmap, today);
+    const overdue_customers = [...cust.values()].filter(c => c.overdue > 0)
+      .map(c => ({ name: c.name, overdue: c.overdue, dso: c.oldestLate }))
       .sort((a, b) => b.overdue - a.overdue).slice(0, 8);
+
     const sumV = a => a.reduce((s, o) => s + num2(o.amount_total), 0);
     return {
       generated_at: new Date().toISOString(), currency: CFG.CURRENCY,
-      customers_evaluated: custs.length,
-      overdue_total: custs.reduce((s, c) => s + num2(c.vt_overdue_amount), 0),
-      credit_exposure: custs.reduce((s, c) => s + num2(c.credit), 0),
+      customers_evaluated: cust.size,
+      overdue_total: overdue_total,
+      credit_exposure: exposure,
       dso_buckets, overdue_customers,
       uninvoiced_value: sumV(uninv), uninvoiced_count: uninv.length,
       new_risk_value: sumV(risk), new_risk_count: risk.length

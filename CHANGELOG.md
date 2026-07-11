@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-07-11 — Debt from transactional facts: invoices replace precomputed fields
+
+Owner's principle adopted: dashboard numbers come from transactional rows
+that can be verified in Odoo one-by-one. The customers table's precomputed
+money fields (`credit`, `vt_overdue_amount`, DSO — a custom-addon black box)
+no longer drive any KPI; `dashboard_customers` is demoted to identity only
+(name, assigned rep, governorate).
+
+- **New `dashboard_invoices`** (`supabase/add-invoices.sql`) synced from
+  `account.move` by n8n v5 (48h write_date lookback so residuals and
+  payment states heal; disabled one-click BACKFILL branch fetches the whole
+  open book on first run).
+- **Adapters rebuilt on invoices**: receivable = Σ open residuals; overdue =
+  residuals past due date; aging strip = amounts by days-late (≤30/31–60/
+  >60/no-due-date); top debtors carry "days overdue" (oldest late invoice).
+  15/15 fixture tests pass on the aging/grouping math.
+- Overview: aging strip now shows IQD amounts; debtors column renamed
+  "Days overdue". Pages otherwise unchanged (same adapter shapes).
+- Cache-bust v=33.
+
 ## 2026-07-11 — Performance: parallel pages, adapter cache, initplan RLS
 
 Measured causes of slowness (from Iraq: ~183ms per round trip):
