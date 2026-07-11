@@ -1,5 +1,90 @@
 # Changelog
 
+## 2026-07-11 — Real governorate + Overview story headings
+
+- **Real governorate from Odoo** (`res.partner.state_id`): n8n v4.1 syncs it
+  into `dashboard_customers.governorate` (`supabase/add-governorate.sql`);
+  the Regions page embeds it through the orders→customers FK and prefers it,
+  falling back to the free-text city dictionary only when empty. `govOf()`
+  also recognizes English governorate names. This is the durable fix for the
+  "Unknown / بدون مدينة" buckets — coverage grows as the field fills in Odoo.
+- **Overview decluttered** (by request): removed the "Cash in process (held
+  by reps)" KPI (the per-holder in-transit panel remains); the placeholder
+  900M target is now 0 → the misleading "% of target / on pace" bar is hidden
+  until a real target exists (ideally synced from Odoo's salesperson.target);
+  "Top governorate" now ignores no-city/unknown buckets so "No city" can
+  never be crowned the top region.
+- **Story headings on the Overview**: five numbered questions (AR/EN) that
+  make the page read top-to-bottom as a narrative — Today: how is the day
+  going? · The month: are we on track? · Names: who do we call? · Rhythm:
+  which way are we trending? · Cash & customers: who holds our money?
+- Cache-bust v=31.
+
+## 2026-07-11 — Raw-tables restructure: n8n is a fetcher, snapshots retired
+
+- **Architecture:** Odoo → n8n (fetch-only) → relational Supabase tables →
+  dashboard queries. No n8n-computed snapshots/summaries anywhere — every
+  aggregate is computed in the browser from rows that can be audited
+  against Odoo one-by-one.
+- **Schema** (`supabase/restructure.sql`): new `salespeople` table (user_id
+  PK — one spelling per rep, backfilled from orders+payments);
+  `dashboard_customers` gains the assigned rep (user_id FK); orders gain
+  `partner_id` FK; `date_order`/`create_date` become timestamptz and
+  payments `date` a real date; indexes for all polling queries; RLS for the
+  new table.
+- **n8n v4** ("Dabboos Sync v4 — raw only"): all snapshot-builder nodes
+  deleted; FK-safe upsert order (salespeople → customers → orders); hourly
+  full pull now fills the `dashboard_customers` MASTER (all real customers,
+  with assigned rep); includes all v3/v3.1 fixes (write_date fetch, states
+  heal, false→null, pagination irrelevant now).
+- **Dashboard:** `D.api("rep_debt"/"collections"/"rep_collections")` are now
+  raw-table adapters returning the same shapes — Debt, Collections and
+  Overview pages unchanged by design. Bases documented in METRICS.md
+  (aging/exposure now cover ALL owing customers, not just recently-seen).
+- Cache-bust v=30. ARCHITECTURE.md rewritten. Cutover order documented in
+  restructure.sql (SQL → n8n v4 + backfill → deploy → retire snapshots).
+
+## 2026-07-08 — Overview v2: business-owner metrics (audit-driven)
+
+### Fixed
+- **MoM was misleading:** it compared the partial current month against the
+  FULL last month. Now compares month-to-date vs the same days of last month,
+  and hides the delta entirely when history doesn't cover the compared days.
+
+### Added — Overview
+- **Today strip:** sales & cash now show "vs 4-week same-weekday average";
+  new "cash in process" aging flag (⚠ N payments older than 3 days + amount);
+  new 4th KPI: orders today + cancelled today.
+- **Overdue card:** receivables age strip (≤30 / 31–60 / >60 DSO customer
+  buckets) + total credit exposure — from the collections snapshot the page
+  already downloads, labeled "as of latest snapshot".
+- **Minis:** cancel rate % and top-10 customer share of period revenue.
+- **Debtors table:** DSO column (red when >60d).
+- **Rep leaderboard:** cash-in-transit and critical-orders columns per rep.
+- **New chart:** weekly confirmed revenue, last 6 Saturday-start weeks
+  (current partial week drawn lighter). No extra data fetched.
+- **New panel:** "Cash in transit — who holds it now?" top courier journals
+  with amount + oldest payment age (red past 3 days).
+- Rejected during verification: "confirmed, not delivered" from
+  `delivery_count` — Odoo counts pickings created at confirmation, not goods
+  delivered; the number would lie (see METRICS.md).
+
+### Added — quotations visibility
+- "Orders per day" is now a 3-way stack: confirmed (blue) + **quotations
+  draft/sent (amber)** + cancelled (grey); bar totals still match Odoo.
+- New "Quotations" mini (count + value for the filter range).
+
+### Docs
+- **`docs/N8N_AUDIT.md`** — full audit of the n8n sync with proofs: snapshot
+  reads silently truncated at Supabase's 1,000-row cap (summary says 964 July
+  orders, table has 986), payment states never heal (32 stale in_process),
+  payments fetch fragile (limit 800, no date filter), 2h payment lag,
+  dashboard_customers upsert never lands, UTC/Baghdad day mixing in
+  snapshots, missing backfill after downtime, service key hygiene + Supabase
+  index/table recommendations.
+- New helpers `D.addDays` / `D.weekStartSat` (8 unit tests pass); metrics
+  bases documented in METRICS.md. Cache-bust v=28.
+
 ## 2026-07-07 — Match Odoo's daily order counts (audit-driven)
 
 - **Audited the "gap" vs Odoo for Jul 1–7:** Supabase has exactly the same 913

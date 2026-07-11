@@ -45,7 +45,11 @@ window.DASH_CONFIG = {
   // meaningless. Set the real monthly goal, OR set it to 0 to HIDE the target
   // bar entirely (the code already falls back to showing order count instead).
   TARGETS: {
-    MONTHLY_REVENUE_TARGET: 900000000,  // IQD confirmed-sales goal for the month (PLACEHOLDER — set the real figure, or 0 to hide)
+    // 0 = HIDE the target bar. The old 900M was a placeholder that showed
+    // misleading "% of target / on pace" figures. The real fix is syncing the
+    // per-rep targets from Odoo's salesperson.target model (docs/ODOO_MODELS.md);
+    // until then, set the real company-wide goal here or keep it hidden.
+    MONTHLY_REVENUE_TARGET: 0,
     COLLECTION_RATE_TARGET: 70        // target for collected ÷ sales (%)
   }
 };
