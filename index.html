@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Sales Command Center</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=32" />
+  <link rel="stylesheet" href="assets/css/style.css?v=33" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -87,9 +87,9 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=32"></script>
-  <script src="assets/js/auth.js?v=32"></script>
-  <script src="assets/js/common.js?v=32"></script>
+  <script src="assets/js/config.js?v=33"></script>
+  <script src="assets/js/auth.js?v=33"></script>
+  <script src="assets/js/common.js?v=33"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -286,7 +286,7 @@
           const pc = x => Math.round(num(x) / dTot * 100);
           dsoHtml =
             `<div class="dso-strip"><i class="d-g" style="width:${pc(db.le30)}%"></i><i class="d-a" style="width:${pc(db.b31_60)}%"></i><i class="d-r" style="width:${pc(db.gt60)}%"></i></div>` +
-            `<div class="ex-sub">${D.t("dso_title")}: <b class="ok">${D.fmtNum(db.le30)}</b> ${D.t("dso_le30")} · <b>${D.fmtNum(db.b31_60)}</b> 31–60 · <b class="danger">${D.fmtNum(db.gt60)}</b> ${D.t("dso_gt60")}</div>`;
+            `<div class="ex-sub">${D.t("dso_title")}: <b class="ok">${D.fmtMoney(db.le30)}</b> ${D.t("dso_le30")} · <b>${D.fmtMoney(db.b31_60)}</b> 31–60 · <b class="danger">${D.fmtMoney(db.gt60)}</b> ${D.t("dso_gt60")}</div>`;
         }
       }
       const expHtml = collSnap && num(collSnap.credit_exposure) > 0
@@ -362,7 +362,7 @@
       ((collSnap && collSnap.overdue_customers) || []).forEach(c => { if (c.dso > 0) dsoMap[c.name] = Math.round(c.dso); });
       box.innerHTML = `
         <table class="dt">
-          <thead><tr><th>${D.t("col_customer")}</th><th>${D.t("col_rep")}</th><th>${D.t("col_overdue")}</th><th>${D.t("col_debit")}</th><th>${D.t("f_dso")}</th></tr></thead>
+          <thead><tr><th>${D.t("col_customer")}</th><th>${D.t("col_rep")}</th><th>${D.t("col_overdue")}</th><th>${D.t("col_debit")}</th><th>${D.t("od_days")}</th></tr></thead>
           <tbody>
           ${top.map(r => {
             const dso = dsoMap[r.name];

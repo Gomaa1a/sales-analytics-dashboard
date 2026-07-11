@@ -26,6 +26,7 @@
 | `dashboard_customers` | `partner_id` PK, `user_id` FK→salespeople | customer MASTER: assigned rep, credit (=receivable), credit_limit, overdue, DSO, trust, sales/payment averages, payment method |
 | `dashboard_orders` | `order_id` PK, `partner_id` FK→customers, `user_id` FK→salespeople | one row per sale order: state, `date_order`/`create_date` (timestamptz), amounts, invoice/delivery counts, risk `level`+`reasons`, embedded customer profile as-of scoring time |
 | `dashboard_payments` | `payment_id` PK, `user_id` FK→salespeople | one row per customer payment: `date` (date), amount, state (paid / in_process / canceled), courier `journal` (pruned at 95 days) |
+| `dashboard_invoices` | `invoice_id` PK | one row per customer invoice (`account.move`): dates, due date, `amount_residual` (what's still unpaid), payment_state — **the transactional source of all debt/aging numbers** |
 | `alert_acks` | | alert acknowledgements written by the dashboard (`acked_by` user) |
 | `dash_users`, `page_views` | | auth roles/permissions + traffic log (`docs/AUTH.md`) |
 

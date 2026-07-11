@@ -10,7 +10,8 @@ Source: the model list exposed by the n8n Odoo node on the live instance
 |---|---|---|
 | `sale.order` | `dashboard_orders` | order headers (state, dates, amounts, counts, risk scoring) |
 | `account.payment` | `dashboard_payments` | inbound customer payments (paid / in_process) |
-| `res.partner` | `dashboard_customers` | customer master (credit, overdue, DSO, trust, assigned rep) |
+| `res.partner` | `dashboard_customers` | customer IDENTITY master (name, assigned rep, governorate, limits) — its precomputed money fields are no longer used by the dashboard |
+| `account.move` | `dashboard_invoices` | customer invoices: due dates + open residuals — the transactional debt source |
 | (derived) | `salespeople` | one row per rep (res.users id + name) |
 
 ## ⭐ Recommended next syncs (priority order)

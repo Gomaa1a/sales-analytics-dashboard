@@ -71,23 +71,29 @@ Sum of `dashboard_payments.amount` in the period. "Collected ÷ sales" divides
 period collections by period **confirmed order value** (tax-inclusive) — a
 rough liquidity signal, not an accounting figure.
 
-## Overdue / Receivable (Debt page)
-Point-in-time balances per customer from the **`dashboard_customers` master
-table** (`credit` = receivable, `vt_overdue_amount` = overdue), grouped by the
-customer's **assigned rep** (`res.partner.user_id`). **The date filter does
-not apply** — it's "as of the last hourly customer sync." "Debt
-concentration" = top-10 debtors' share of total overdue.
+## Overdue / Receivable (Debt page) — transactional basis (2026-07-11)
+Debt is computed from **open customer invoices** (`dashboard_invoices`,
+synced from Odoo `account.move`, `move_type = out_invoice`):
+- **Receivable** = Σ `amount_residual` of `posted` invoices with residual > 0.
+- **Overdue** = the slice whose `due_date` has passed (Baghdad today).
+- Grouped by customer, then by the customer's **assigned rep**; identity
+  (name / rep / governorate) comes from the customers master, whose
+  precomputed money fields (`credit`, `vt_*`, DSO) are **no longer used**.
+Every figure traces to invoice rows visible in Odoo → Accounting →
+Customer Invoices. The date filter does not apply — it's "as of now".
+Expect small differences vs Odoo's custom `vt_overdue_amount` addon: this
+basis is pure due-date aging.
 
 ## Raw-table adapter bases (2026-07 restructure — snapshots retired)
 - **14-day collections grid** = `dashboard_payments` rows of the last 14
   Baghdad days; paid = state `paid`, pending = state `in_process`.
-- **DSO aging buckets / credit exposure / top overdue** = ALL customers in
-  the master with `credit > 0` or overdue `> 0` (previously: only customers
-  seen in the last 30 days of orders — the new basis is broader and honest).
+- **Receivables age strip** = open-invoice residual AMOUNTS bucketed by
+  days past due: ≤30 (incl. not yet due), 31–60, >60, unknown (no due date).
+- **"Days overdue" column** = the customer's oldest overdue invoice age.
+- **Credit exposure** = Σ all open residuals (the whole open book).
 - **Uninvoiced** = confirmed orders of the last 95 days with
   `invoice_count = 0` (same window the old snapshot used).
-- **New risk** = this month's confirmed orders with `level = critical`
-  (previously a near-identical customer-flag rule computed in n8n).
+- **New risk** = this month's confirmed orders with `level = critical`.
 
 ## DSO (Days Sales Outstanding)
 `receivable / thisMonthConfirmedSales × 30`. A **rough proxy** only: it mixes a
