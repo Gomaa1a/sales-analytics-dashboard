@@ -17,7 +17,7 @@
 -- ⚠️ ORDER OF OPERATIONS (avoid breaking the live dashboard):
 --   1. Deploy the new dashboard code (login page etc.) first.
 --   2. Run this script.
---   3. Create your own admin user (see BOOTSTRAP at the bottom).
+--    3. Create your own admin user (see BOOTSTRAP at the bottom).
 --   Old clients still running pre-auth code will stop seeing data the
 --   moment this script runs — that is the point of the lockdown.
 --
@@ -78,6 +78,13 @@ create trigger on_auth_user_created_dash
   after insert on auth.users
   for each row execute function public.handle_new_dash_user();
 
+-- Backfill: profiles for auth users created BEFORE the trigger existed
+-- (idempotent — safe to re-run).
+insert into public.dash_users (user_id, username, full_name, role, is_active)
+select id, split_part(email, '@', 1), null, 'alerts', false
+from auth.users
+on conflict (user_id) do nothing;
+
 -- ------------------------------------------------------------
 -- 2. Traffic log
 -- ------------------------------------------------------------
@@ -123,7 +130,8 @@ begin
     select policyname, tablename from pg_policies
     where schemaname = 'public'
       and tablename in ('dashboard_orders', 'dashboard_payments',
-                        'dashboard_snapshots', 'alert_acks',
+                        'dashboard_snapshots', 'dashboard_customers',
+                        'dashboard_monthly', 'alert_acks',
                         'dash_users', 'page_views', 'salespeople')
   loop
     execute format('drop policy %I on public.%I', p.policyname, p.tablename);
@@ -133,6 +141,8 @@ end $$;
 alter table public.dashboard_orders    enable row level security;
 alter table public.dashboard_payments  enable row level security;
 alter table public.dashboard_snapshots enable row level security;
+alter table public.dashboard_customers enable row level security;
+alter table public.dashboard_monthly   enable row level security;
 alter table public.alert_acks          enable row level security;
 alter table public.dash_users          enable row level security;
 alter table public.page_views          enable row level security;
@@ -141,12 +151,16 @@ alter table public.page_views          enable row level security;
 revoke all on public.dashboard_orders    from anon;
 revoke all on public.dashboard_payments  from anon;
 revoke all on public.dashboard_snapshots from anon;
+revoke all on public.dashboard_customers from anon;
+revoke all on public.dashboard_monthly   from anon;
 revoke all on public.alert_acks          from anon;
 revoke all on public.dash_users          from anon;
 revoke all on public.page_views          from anon;
 grant select                 on public.dashboard_orders,
                                 public.dashboard_payments,
-                                public.dashboard_snapshots to authenticated;
+                                public.dashboard_snapshots,
+                                public.dashboard_customers,
+                                public.dashboard_monthly to authenticated;
 grant select, insert         on public.alert_acks, public.page_views to authenticated;
 grant select, update         on public.dash_users to authenticated;
 
@@ -166,6 +180,14 @@ create policy payments_read on public.dashboard_payments
   using (public.dash_role() in ('admin', 'management'));
 
 create policy snapshots_read on public.dashboard_snapshots
+  for select to authenticated
+  using (public.dash_role() in ('admin', 'management'));
+
+create policy customers_read on public.dashboard_customers
+  for select to authenticated
+  using (public.dash_role() in ('admin', 'management'));
+
+create policy monthly_read on public.dashboard_monthly
   for select to authenticated
   using (public.dash_role() in ('admin', 'management'));
 
