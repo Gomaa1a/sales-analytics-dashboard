@@ -747,18 +747,16 @@
 
   // Receivables health, all from OPEN INVOICES: true aging by due date
   // (amounts, not counts), total exposure = the open book, top overdue with
-  // days-late. Uninvoiced and new-risk stay orders-based. See docs/METRICS.md.
+  // days-late. New-risk stays orders-based. See docs/METRICS.md.
+  // ("Confirmed, not invoiced" was removed from the UI by request 2026-07-12.)
   async function buildCollections() {
     const today = bagToday();
-    const since95 = addDays(today, -95);
     const monthStart = today.slice(0, 7) + "-01";
-    const [inv, idmap, uninvRaw, riskRaw] = await Promise.all([
+    const [inv, idmap, riskRaw] = await Promise.all([
       loadOpenInvoices(),
       loadCustomerIdentity(),
-      sbGetAll(`${CFG.TABLES.orders}?select=order_id,amount_total&state=in.(sale,done)&invoice_count=eq.0&date_order=gte.${since95}`),
       sbGetAll(`${CFG.TABLES.orders}?select=order_id,amount_total&state=in.(sale,done)&level=eq.critical&date_order=gte.${monthStart}`)
     ]);
-    const uninv = dedupeBy(uninvRaw, "order_id");
     const risk = dedupeBy(riskRaw, "order_id");
     const num2 = n => Number(n) || 0;
 
@@ -789,7 +787,6 @@
       overdue_total: overdue_total,
       credit_exposure: exposure,
       dso_buckets, overdue_customers,
-      uninvoiced_value: sumV(uninv), uninvoiced_count: uninv.length,
       new_risk_value: sumV(risk), new_risk_count: risk.length
     };
   }

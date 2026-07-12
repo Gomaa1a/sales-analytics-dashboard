@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Sales Command Center</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=35" />
+  <link rel="stylesheet" href="assets/css/style.css?v=36" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -87,9 +87,9 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=35"></script>
-  <script src="assets/js/auth.js?v=35"></script>
-  <script src="assets/js/common.js?v=35"></script>
+  <script src="assets/js/config.js?v=36"></script>
+  <script src="assets/js/auth.js?v=36"></script>
+  <script src="assets/js/common.js?v=36"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -304,9 +304,7 @@
         card(D.t("ex_cash"), D.fmtMoney(cashMonth), "") +
           `<div class="ex-sub" style="margin-top:9px">${D.t("coll_vs_sales")}: <b>${vsSales != null ? vsSales + "%" : "—"}</b></div></div>` +
         `<div class="exec-card"><div class="ex-l">${D.t("ex_overdue")}</div><div class="exec-row"><div class="exec-n" style="color:var(--red)">${D.fmtMoney(overdue)}</div></div>` +
-          `<div class="ex-sub" style="margin-top:9px">${D.t("ex_conc_sub")}: <b>${conc}%</b></div>${dsoHtml}${expHtml}</div>` +
-        `<div class="exec-card"><div class="ex-l">${D.t("uninvoiced")}</div><div class="exec-row"><div class="exec-n" style="color:var(--amb)">${collSnap ? D.fmtMoney(num(collSnap.uninvoiced_value)) : "—"}</div></div>` +
-          `<div class="ex-sub" style="margin-top:9px">${collSnap ? `${D.fmtNum(collSnap.uninvoiced_count)} ${D.t("orders")}` : "&nbsp;"}</div></div>`;
+          `<div class="ex-sub" style="margin-top:9px">${D.t("ex_conc_sub")}: <b>${conc}%</b></div>${dsoHtml}${expHtml}</div>`;
 
       // ----- minis (filter-range) -----
       // "Top governorate" only considers REAL governorates — a missing city in
