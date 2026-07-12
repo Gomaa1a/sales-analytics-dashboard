@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-07-12 — Net receivable ledger + calmer polling (v35)
+
+- **Debt now nets unapplied credits**: the ledger backfill captured 1,532.6M
+  gross while the true net book is ~1,376M — the gap is customer payments /
+  credit notes not yet matched to invoices (negative residuals). The
+  adapter now loads `amount_residual != 0` and credits subtract per
+  customer and per aging bucket, mirroring Odoo's Aged Receivable.
+  "Days late" is computed from debit items only. n8n v5.3 backfill fetches
+  both signs.
+- **POLL_MS 60s → 180s**: every poll re-downloads and re-renders the whole
+  window; on low-power machines the 60s cycle kept the main thread busy
+  enough for Chrome's "Page Unresponsive" prompt. Heavy aggregates remain
+  cached 4 minutes.
+- Cache-bust v=35.
+
 ## 2026-07-12 — Today's orders explained + staged rendering + AR ledger (v34)
 
 - **"Orders today (as in Odoo)" KPI**: the big number is now the day's TOTAL
