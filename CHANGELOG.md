@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-07-12 — Today's orders explained + staged rendering + AR ledger (v34)
+
+- **"Orders today (as in Odoo)" KPI**: the big number is now the day's TOTAL
+  record count (matches Odoo's grouped list, e.g. 172), with the composition
+  spelled out underneath: ✓ confirmed · quotations · cancelled.
+- **Staged rendering (Overview)**: the page paints as soon as orders+payments
+  arrive (~1–2s); debt/aging panels re-render when their queries finish.
+  Every table/chart section is individually guarded — a failure logs
+  `[overview] <section>` to the console and empties only that panel, never
+  the whole page. Loading placeholder replaces the frozen-looking blank.
+- **Debt basis corrected — Sync v5.1**: invoices-only capture was 322M of a
+  ~1,349M receivable book (opening balances/journal entries are not
+  invoices). v5.1 feeds `dashboard_invoices` from `account.move.line`
+  open receivable items (the partner ledger) — complete and still 100%
+  transactional. Requires: `delete from dashboard_invoices;` then import
+  v5.1 + run its BACKFILL branch once.
+- Cache-bust v=34.
+
 ## 2026-07-11 — Debt from transactional facts: invoices replace precomputed fields
 
 Owner's principle adopted: dashboard numbers come from transactional rows

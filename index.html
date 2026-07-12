@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Sales Command Center</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=33" />
+  <link rel="stylesheet" href="assets/css/style.css?v=34" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -87,9 +87,9 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=33"></script>
-  <script src="assets/js/auth.js?v=33"></script>
-  <script src="assets/js/common.js?v=33"></script>
+  <script src="assets/js/config.js?v=34"></script>
+  <script src="assets/js/auth.js?v=34"></script>
+  <script src="assets/js/common.js?v=34"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -147,7 +147,7 @@
       const wFrom = [from, lastMonthStart].sort()[0];
       const wTo = to > today ? to : today;
       if (wFrom !== loadedFrom || wTo !== loadedTo) await loadWindow(wFrom, wTo);
-      render();
+      safeRender();
     }
 
     async function loadWindow(from, to) {
@@ -250,6 +250,10 @@
       const typCash = typAvg(paysRC, p => String(p.date).slice(0, 10), p => num(p.amount));
 
       const cancelledToday = allRows.filter(o => o.state === "cancel" && dayOf(o) === today && matchRC(o)).length;
+      const draftToday = allRows.filter(o => (o.state === "draft" || o.state === "sent") && dayOf(o) === today && matchRC(o)).length;
+      // the big number = EVERY order record of today, the same total Odoo's
+      // grouped Orders list shows; the sub line explains its composition
+      const totalToday = salesTodayRows.length + cancelledToday + draftToday;
 
       // (the "cash in process" KPI was removed by request — the per-holder
       // in-transit panel at the bottom still covers that money)
@@ -258,8 +262,10 @@
           typicalTag(salesToday, typSales) || `${D.fmtNum(salesTodayRows.length)} ${D.t("orders")} · ${today}`) +
         kpi("k-grn", D.t("coll_today"), D.fmtMoney(cashToday),
           typicalTag(cashToday, typCash) || `${D.fmtNum(cashTodayRows.length)} ${D.t("payments_count")} · ${today}`) +
-        kpi("k-vio", D.t("ov_today_orders"), D.fmtNum(salesTodayRows.length),
-          cancelledToday ? `${D.fmtNum(cancelledToday)} ${D.stateLabel("cancel")}` : "&nbsp;");
+        kpi("k-vio", D.t("ov_today_orders"), D.fmtNum(totalToday),
+          `<span class="ok">✓ ${D.fmtNum(salesTodayRows.length)} ${D.t("ov_confirmed_short")}</span>` +
+          ` · ${D.fmtNum(draftToday)} ${D.t("ov_quotes")}` +
+          ` · <span class="${cancelledToday ? "danger" : "muted"}">${D.fmtNum(cancelledToday)} ${D.t("ov_not_confirmed")}</span>`);
 
       // ----- overdue / receivable (respect rep + customer filter) -----
       const debtRC = debtRows.filter(r => (!v.rep || r.salesperson === v.rep) && (!v.cust || String(r.name || "").toLowerCase().includes(v.cust)));
@@ -343,16 +349,19 @@
       // ----- narrative -----
       document.getElementById("storyText").innerHTML = buildStory({ revMonth, momRev, hasLast: revLast > 0, attain, pace, vsSales, overdue, conc, topGov, govShare });
 
-      // ----- action tables -----
-      renderDebtors(byOver.slice(0, 10));
-      renderLeaderboard(confAll, paysRC);
-      renderTransit(paysRC);
-
-      // ----- charts -----
-      drawByDay(rangeRows);
-      drawWeekly(confAll);
-      drawTopCustomers(rConf);
+      // ----- action tables + charts -----
+      // each section individually guarded: one failure logs to the console
+      // and leaves only its own panel empty, never a blank page
+      sect("debtors", () => renderDebtors(byOver.slice(0, 10)));
+      sect("leaderboard", () => renderLeaderboard(confAll, paysRC));
+      sect("transit", () => renderTransit(paysRC));
+      sect("chart-days", () => drawByDay(rangeRows));
+      sect("chart-weeks", () => drawWeekly(confAll));
+      sect("chart-customers", () => drawTopCustomers(rConf));
     }
+
+    const sect = (name, fn) => { try { fn(); } catch (e) { console.error("[overview] " + name + ":", e); } };
+    function safeRender() { try { render(); } catch (e) { console.error("[overview] render failed:", e); } }
 
     function renderDebtors(top) {
       const box = document.getElementById("debtorsBox");
@@ -554,13 +563,21 @@
       });
     }
 
+    // Two-phase load: paint from orders+payments as soon as they arrive
+    // (~1-2s); debt/aging/uninvoiced re-render when their queries finish.
+    // Waiting for everything before the first paint made the page look
+    // frozen on slow connections.
+    document.getElementById("todayKpis").innerHTML =
+      `<div class="kpi"><div class="kpi-l">&nbsp;</div><div class="kpi-n" style="font-size:15px">${D.t("loading")}</div><div class="kpi-sub">&nbsp;</div></div>`;
     (async function init() {
-      await Promise.all([loadWindow(lastMonthStart, today), loadSnapshots()]);
-      render();
+      loadSnapshots().then(safeRender);
+      await loadWindow(lastMonthStart, today);
+      safeRender();
     })();
     setInterval(async () => {
-      await Promise.all([loadWindow(loadedFrom || lastMonthStart, loadedTo || today), loadSnapshots()]);
-      render();
+      loadSnapshots().then(safeRender);
+      await loadWindow(loadedFrom || lastMonthStart, loadedTo || today);
+      safeRender();
     }, D.cfg.POLL_MS);
   })();
   </script>

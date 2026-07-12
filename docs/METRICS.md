@@ -71,18 +71,20 @@ Sum of `dashboard_payments.amount` in the period. "Collected ÷ sales" divides
 period collections by period **confirmed order value** (tax-inclusive) — a
 rough liquidity signal, not an accounting figure.
 
-## Overdue / Receivable (Debt page) — transactional basis (2026-07-11)
-Debt is computed from **open customer invoices** (`dashboard_invoices`,
-synced from Odoo `account.move`, `move_type = out_invoice`):
-- **Receivable** = Σ `amount_residual` of `posted` invoices with residual > 0.
-- **Overdue** = the slice whose `due_date` has passed (Baghdad today).
+## Overdue / Receivable (Debt page) — transactional basis (2026-07-12)
+Debt is computed from the **receivable LEDGER open items**
+(`dashboard_invoices`, synced from Odoo `account.move.line` where
+`account_type = asset_receivable` — Sync v5.1):
+- **Receivable** = Σ `amount_residual` of posted, unreconciled items.
+- **Overdue** = the slice whose `date_maturity` (due date) has passed.
 - Grouped by customer, then by the customer's **assigned rep**; identity
-  (name / rep / governorate) comes from the customers master, whose
-  precomputed money fields (`credit`, `vt_*`, DSO) are **no longer used**.
-Every figure traces to invoice rows visible in Odoo → Accounting →
-Customer Invoices. The date filter does not apply — it's "as of now".
-Expect small differences vs Odoo's custom `vt_overdue_amount` addon: this
-basis is pure due-date aging.
+  comes from the customers master, whose precomputed money fields
+  (`credit`, `vt_*`, DSO) are **no longer used** for any KPI.
+⚠️ Lesson recorded 2026-07-12: syncing only customer *invoices*
+(`account.move`, out_invoice) captured 322M of a ~1,349M book — the rest is
+**opening balances / journal entries** that are receivable but not invoices.
+The ledger (journal items) is the complete transactional truth; every row
+matches Odoo → Accounting → Partner Ledger.
 
 ## Raw-table adapter bases (2026-07 restructure — snapshots retired)
 - **14-day collections grid** = `dashboard_payments` rows of the last 14
