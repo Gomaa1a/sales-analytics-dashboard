@@ -93,9 +93,9 @@ matches Odoo → Accounting → Partner Ledger.
   days past due: ≤30 (incl. not yet due), 31–60, >60, unknown (no due date).
 - **"Days overdue" column** = the customer's oldest overdue invoice age.
 - **Credit exposure** = Σ all open residuals (the whole open book).
-- **Uninvoiced** = confirmed orders of the last 95 days with
-  `invoice_count = 0` (same window the old snapshot used).
 - **New risk** = this month's confirmed orders with `level = critical`.
+- ~~Uninvoiced~~ — removed from the UI 2026-07-12 by owner request (was:
+  confirmed orders of the last 95 days with `invoice_count = 0`).
 
 ## DSO (Days Sales Outstanding)
 `receivable / thisMonthConfirmedSales × 30`. A **rough proxy** only: it mixes a

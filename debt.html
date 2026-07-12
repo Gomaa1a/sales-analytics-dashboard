@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Credit & Collections</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=35" />
+  <link rel="stylesheet" href="assets/css/style.css?v=36" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -45,10 +45,10 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=35"></script>
-  <script src="assets/js/auth.js?v=35"></script>
-  <script src="assets/js/common.js?v=35"></script>
-  <script src="assets/js/order-modal.js?v=35"></script>
+  <script src="assets/js/config.js?v=36"></script>
+  <script src="assets/js/auth.js?v=36"></script>
+  <script src="assets/js/common.js?v=36"></script>
+  <script src="assets/js/order-modal.js?v=36"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -93,8 +93,7 @@
         kpi("k-red", D.t("debt_due_all"), D.fmtMoney(overdue), D.t("debt_due_sub")) +
         kpi("k-amb", D.t("debt_due_pct"), duePct + "%", D.t("debt_due_pct_sub")) +
         kpi("", D.t("debt_concentration"), conc + "%", D.t("debt_top10_sub")) +
-        kpi("k-red", D.t("new_risk"), order ? D.fmtMoney(order.new_risk_value) : "—", order ? `${D.fmtNum(order.new_risk_count)} ${D.t("orders")}` : "&nbsp;") +
-        kpi("", D.t("uninvoiced"), order ? D.fmtMoney(order.uninvoiced_value) : "—", order ? `${D.fmtNum(order.uninvoiced_count)} ${D.t("orders")}` : "&nbsp;");
+        kpi("k-red", D.t("new_risk"), order ? D.fmtMoney(order.new_risk_value) : "—", order ? `${D.fmtNum(order.new_risk_count)} ${D.t("orders")}` : "&nbsp;");
 
       drawGov(f);
       drawReps(f);

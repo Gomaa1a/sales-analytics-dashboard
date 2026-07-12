@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-07-12 — Remove "Confirmed, not invoiced" (v36)
+
+- Removed by owner request: the Overview exec card and the Debt-page KPI;
+  the adapter no longer runs its query (one less request per refresh).
+  Exec band is now 3 cards: revenue · cash · overdue+aging.
+- Cache-bust v=36.
+
 ## 2026-07-12 — Net receivable ledger + calmer polling (v35)
 
 - **Debt now nets unapplied credits**: the ledger backfill captured 1,532.6M
