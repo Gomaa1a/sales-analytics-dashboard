@@ -20,8 +20,11 @@ window.DASH_CONFIG = {
     snapshots: "dashboard_snapshots"
   },
 
-  // Live refresh interval in milliseconds (default 60s).
-  POLL_MS: 60000,
+  // Live refresh interval in milliseconds. 3 minutes: every poll re-downloads
+  // and re-renders the whole window, and a 60s cycle kept low-power machines
+  // permanently busy ("Page Unresponsive"). Heavy aggregates are additionally
+  // cached for 4 minutes in common.js.
+  POLL_MS: 180000,
 
   // Currency label shown next to amounts.
   CURRENCY: "IQD",

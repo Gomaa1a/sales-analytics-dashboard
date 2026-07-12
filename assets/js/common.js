@@ -675,9 +675,13 @@
      open in Odoo. The customers master only supplies IDENTITY (name,
      assigned rep, governorate) — its precomputed money fields are unused. */
   async function loadOpenInvoices() {
+    // residual != 0, not > 0: unapplied credits (customer payments / credit
+    // notes not yet matched to invoices) carry NEGATIVE residuals and must
+    // subtract, or every customer's debt reads too high. This mirrors
+    // Odoo's Aged Receivable, which nets both signs per bucket.
     return dedupeBy(await sbGetAll(
       `dashboard_invoices?select=invoice_id,partner_id,partner_name,user_id,amount_residual,due_date` +
-      `&state=eq.posted&amount_residual=gt.0`), "invoice_id");
+      `&state=eq.posted&amount_residual=neq.0`), "invoice_id");
   }
   async function loadCustomerIdentity() {
     const rows = await sbGetAll(
@@ -705,9 +709,11 @@
       e.receivable += amt;
       const due = i.due_date ? String(i.due_date).slice(0, 10) : "";
       if (due && due < today) {
-        e.overdue += amt;
-        const late = Math.round((Date.parse(today) - Date.parse(due)) / 864e5);
-        if (late > e.oldestLate) e.oldestLate = late;
+        e.overdue += amt; // credits net against the overdue slice too
+        if (amt > 0) {    // "days late" only makes sense for actual debits
+          const late = Math.round((Date.parse(today) - Date.parse(due)) / 864e5);
+          if (late > e.oldestLate) e.oldestLate = late;
+        }
       }
     }
     return cust;
