@@ -101,7 +101,8 @@
       payments_count: "دفعة",
       // executive summary band (merged into the overview)
       exec_title: "النظرة التنفيذية",
-      ex_revenue: "المبيعات المؤكدة — هذا الشهر",
+      ex_revenue: "المفوتر — هذا الشهر (فواتير مرحّلة)",
+      ex_rev_collected: "حُصّل منها",
       ex_target: "الهدف",
       ex_of_target: "من الهدف",
       ex_pace: "على المسار لتحقيق",
@@ -171,7 +172,7 @@
       coll_last_month: "الشهر الماضي",
       coll_mom: "التغير الشهري",
       coll_sales_month: "مبيعات الفترة",
-      coll_vs_sales: "التحصيل ÷ المبيعات",
+      coll_vs_sales: "التحصيل ÷ المفوتر",
       coll_rep_perf: "أداء المندوبين في التحصيل",
       // customer debt by salesperson (مديونية العملاء)
       debt_title: "مديونية العملاء المستحقة",
@@ -364,7 +365,8 @@
       payments_count: "payments",
       // executive summary band (merged into the overview)
       exec_title: "Executive summary",
-      ex_revenue: "Confirmed sales — this month",
+      ex_revenue: "Invoiced — this month (posted)",
+      ex_rev_collected: "collected so far",
       ex_target: "Target",
       ex_of_target: "of target",
       ex_pace: "On pace for",
@@ -431,7 +433,7 @@
       coll_last_month: "Last month",
       coll_mom: "MoM change",
       coll_sales_month: "Period sales",
-      coll_vs_sales: "Collected ÷ sales",
+      coll_vs_sales: "Collected ÷ invoiced",
       coll_rep_perf: "Rep collection performance",
       // customer debt by salesperson
       debt_title: "Outstanding customer debt",
@@ -865,11 +867,43 @@
     return data;
   }
 
+  // Invoiced revenue for the month band: posted INV/ invoices of this month,
+  // plus last month's SAME-DAYS total for an honest MoM. Requires the
+  // "BACKFILL Months" run once in n8n v5.5 — before it, fully-paid invoices
+  // from before the ledger cutover are missing and the totals undercount.
+  async function buildInvoicesMonth() {
+    const today = bagToday();
+    const thisMonth = today.slice(0, 7);
+    const domN = Number(today.slice(8, 10));
+    const lastMonthStart = addDays(thisMonth + "-01", -1).slice(0, 7) + "-01";
+    const lastMonth = lastMonthStart.slice(0, 7);
+    const rows = dedupeBy(await sbGetAll(
+      `dashboard_invoices?select=invoice_id,amount_total,amount_residual,state,invoice_date` +
+      `&invoice_date=gte.${lastMonthStart}&name=like.INV*&state=eq.posted`), "invoice_id");
+    const num2 = n => Number(n) || 0;
+    let value = 0, count = 0, collected = 0, lastMTD = 0, lastAny = 0;
+    for (const x of rows) {
+      const d = String(x.invoice_date).slice(0, 10);
+      const t = num2(x.amount_total);
+      if (d.slice(0, 7) === thisMonth) {
+        value += t; count++;
+        collected += t - num2(x.amount_residual);
+      } else if (d.slice(0, 7) === lastMonth) {
+        lastAny += t;
+        if (Number(d.slice(8, 10)) <= domN) lastMTD += t;
+      }
+    }
+    return { generated_at: new Date().toISOString(), currency: CFG.CURRENCY,
+      month: thisMonth, value, count, collected,
+      last_mtd: lastMTD, last_month_has_data: lastAny > 0 };
+  }
+
   async function api(endpointKey, params) {
     // Raw-table adapters (used to be n8n snapshots — see docs/ARCHITECTURE.md).
     if (endpointKey === "rep_collections") return cachedApi("rep_collections", buildRepCollections);
     if (endpointKey === "rep_debt") return cachedApi("rep_debt", buildRepDebt);
     if (endpointKey === "collections") return cachedApi("collections", buildCollections);
+    if (endpointKey === "invoices_month") return cachedApi("invoices_month", buildInvoicesMonth);
     if (endpointKey === "invoices_today") return buildInvoicesToday(); // uncached: it IS today
 
     if (endpointKey === "acks") {

@@ -86,6 +86,17 @@ Debt is computed from the **receivable LEDGER open items**
 The ledger (journal items) is the complete transactional truth; every row
 matches Odoo → Accounting → Partner Ledger.
 
+## Invoiced — this month (Overview month card, 2026-07-13)
+Σ `amount_total` of POSTED INV/ invoices with `invoice_date` in the current
+month (accounting revenue). MoM compares vs last month's SAME days, invoice
+basis, hidden when last month's invoices aren't in the table. Sub-line shows
+invoice count + how much of the month's invoicing is already collected
+(Σ total − residual). "Collected ÷ invoiced" = payments month ÷ invoiced
+month. ⚠ Requires the v5.5 "BACKFILL Months" one-time run — the ledger
+backfill only fetched OPEN items, so fully-paid invoices from before the
+cutover are missing until then (undercount). The order-based month numbers
+remain on the charts/minis (commercial view), clearly separated.
+
 ## Invoiced today (Overview, 2026-07-13)
 From `dashboard_invoices`, INV/ documents with `invoice_date = today`:
 - **Invoiced today** = Σ `amount_total` of POSTED invoices (accounting
