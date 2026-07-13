@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Sales Command Center</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=36" />
+  <link rel="stylesheet" href="assets/css/style.css?v=37" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -25,6 +25,10 @@
     <!-- Row 1 — TODAY: how is the day going? (always anchored to today) -->
     <h2 class="sect-h" id="secToday"></h2>
     <div id="todayKpis" class="kpi-grid"></div>
+    <div class="panel" style="margin-bottom:16px">
+      <div class="panel-head"><h2 id="invTodayTitle"></h2></div>
+      <div class="panel-body" style="padding:0"><div id="invTodayBox"></div></div>
+    </div>
 
     <!-- Row 2 — THE MONTH: sales vs target · cash · overdue · uninvoiced -->
     <h2 class="sect-h" id="secMonth"></h2>
@@ -87,9 +91,9 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=36"></script>
-  <script src="assets/js/auth.js?v=36"></script>
-  <script src="assets/js/common.js?v=36"></script>
+  <script src="assets/js/config.js?v=37"></script>
+  <script src="assets/js/auth.js?v=37"></script>
+  <script src="assets/js/common.js?v=37"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -109,6 +113,7 @@
     document.getElementById("secNames").textContent = D.t("sec_names");
     document.getElementById("secRhythm").textContent = D.t("sec_rhythm");
     document.getElementById("secWho").textContent = D.t("sec_who");
+    document.getElementById("invTodayTitle").textContent = D.t("inv_today_tbl");
 
     const isConf = o => o.state === "sale" || o.state === "done";
     const val = o => Number(o.amount_total) || 0;
@@ -121,7 +126,7 @@
     const TARGET = num(TARGETS.MONTHLY_REVENUE_TARGET);
 
     let dayChart = null, custChart = null, weekChart = null;
-    let allRows = [], payments = [], debtRows = [], alerts = [], collSnap = null;
+    let allRows = [], payments = [], debtRows = [], alerts = [], collSnap = null, invToday = null;
     let loadedFrom = null, loadedTo = null;
 
     // Baghdad calendar anchors
@@ -157,7 +162,7 @@
         const prevDay = s => { const d = new Date(s + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() - 1); return d.toISOString().slice(0, 10); };
         [allRows, payments] = await Promise.all([
           D.loadOrders({ from: prevDay(from), to, dateField: "date_order",
-            select: "order_id,order_name,partner_name,salesperson,user_id,city,state,amount_total,create_date,date_order" }),
+            select: "order_id,order_name,partner_name,salesperson,user_id,city,state,amount_total,create_date,date_order,dashboard_customers(governorate,city)" }),
           D.loadPayments({ from, to })
         ]);
         loadedFrom = from; loadedTo = to;
@@ -176,6 +181,7 @@
       } catch (e) { debtRows = []; }
       try { const a = await D.api("alerts"); alerts = a.alerts || []; } catch (e) { alerts = []; }
       try { collSnap = await D.api("collections"); } catch (e) { collSnap = null; }
+      try { invToday = await D.api("invoices_today"); } catch (e) { invToday = null; }
     }
 
     const kpi = (cls, label, n, sub) =>
@@ -246,7 +252,6 @@
         const p = Math.round((val_ - avg) / avg * 100);
         return `<span class="${p >= 0 ? "ok" : "danger"}">${p >= 0 ? "▲" : "▼"} ${Math.abs(p)}%</span> ${D.t("ov_vs_typical")}`;
       };
-      const typSales = typAvg(confAll, dayOf, val);
       const typCash = typAvg(paysRC, p => String(p.date).slice(0, 10), p => num(p.amount));
 
       const cancelledToday = allRows.filter(o => o.state === "cancel" && dayOf(o) === today && matchRC(o)).length;
@@ -255,17 +260,25 @@
       // grouped Orders list shows; the sub line explains its composition
       const totalToday = salesTodayRows.length + cancelledToday + draftToday;
 
-      // (the "cash in process" KPI was removed by request — the per-holder
-      // in-transit panel at the bottom still covers that money)
+      // First KPI = INVOICED today (accounting basis: posted customer
+      // invoices dated today, per owner request) — labeled so it is never
+      // confused with the order-based figures next to it.
+      const invPosted = invToday && invToday.posted;
+      const collectedPct = invPosted && invPosted.value > 0
+        ? Math.round(num(invToday.collected_today) / invPosted.value * 100) : null;
       document.getElementById("todayKpis").innerHTML =
-        kpi("", D.t("ov_today_sales"), D.fmtMoney(salesToday),
-          typicalTag(salesToday, typSales) || `${D.fmtNum(salesTodayRows.length)} ${D.t("orders")} · ${today}`) +
+        kpi("", D.t("inv_today"), invPosted ? D.fmtMoney(invPosted.value) : "—",
+          invPosted
+            ? `${D.fmtNum(invPosted.n)} ${D.t("invoices_w")}${collectedPct != null ? ` · <span class="ok">${collectedPct}% ${D.t("collected_same_day")}</span>` : ""}`
+            : D.t("loading")) +
         kpi("k-grn", D.t("coll_today"), D.fmtMoney(cashToday),
           typicalTag(cashToday, typCash) || `${D.fmtNum(cashTodayRows.length)} ${D.t("payments_count")} · ${today}`) +
         kpi("k-vio", D.t("ov_today_orders"), D.fmtNum(totalToday),
           `<span class="ok">✓ ${D.fmtNum(salesTodayRows.length)} ${D.t("ov_confirmed_short")}</span>` +
           ` · ${D.fmtNum(draftToday)} ${D.t("ov_quotes")}` +
           ` · <span class="${cancelledToday ? "danger" : "muted"}">${D.fmtNum(cancelledToday)} ${D.t("ov_not_confirmed")}</span>`);
+
+      sect("invoices-today", () => renderInvToday(salesToday));
 
       // ----- overdue / receivable (respect rep + customer filter) -----
       const debtRC = debtRows.filter(r => (!v.rep || r.salesperson === v.rep) && (!v.cust || String(r.name || "").toLowerCase().includes(v.cust)));
@@ -295,9 +308,11 @@
             `<div class="ex-sub">${D.t("dso_title")}: <b class="ok">${D.fmtMoney(db.le30)}</b> ${D.t("dso_le30")} · <b>${D.fmtMoney(db.b31_60)}</b> 31–60 · <b class="danger">${D.fmtMoney(db.gt60)}</b> ${D.t("dso_gt60")}</div>`;
         }
       }
-      const expHtml = collSnap && num(collSnap.credit_exposure) > 0
+      const expHtml = (collSnap && num(collSnap.credit_exposure) > 0
         ? `<div class="ex-sub">${D.t("credit_exposure")}: <b>${D.fmtMoney(num(collSnap.credit_exposure))}</b> <span style="opacity:.65">(${D.t("as_of_snapshot")})</span></div>`
-        : "";
+        : "") + (collSnap && num(collSnap.due_7d) > 0
+        ? `<div class="ex-sub">${D.t("due_7d")}: <b>${D.fmtMoney(num(collSnap.due_7d))}</b></div>`
+        : "");
 
       document.getElementById("execHeads").innerHTML =
         card(D.t("ex_revenue"), D.fmtMoney(revMonth), momValid ? deltaTag(momRev) : "") + targetBlock + `</div>` +
@@ -309,9 +324,13 @@
       // ----- minis (filter-range) -----
       // "Top governorate" only considers REAL governorates — a missing city in
       // Odoo must never be crowned the top region ("No city 23%" is noise).
+      // Same partner-data preference chain as the Regions page.
       const govAgg = {}; let govTotal = 0;
       rConf.forEach(o => {
-        const k = D.govOf(o.city).key;
+        const mc = o.dashboard_customers || {};
+        const realGov = mc.governorate ? String(mc.governorate).replace(/\s*\(.*?\)\s*$/, "").trim() : "";
+        const cityPick = (mc.city && String(mc.city).trim()) || o.city;
+        const k = D.govOf(realGov || cityPick).key;
         govTotal += val(o);
         if (k === "nocity" || k === "unknown") return;
         const g = D.govLabel(k);
@@ -414,6 +433,36 @@
             </tr>`; }).join("")}
           </tbody>
         </table>`;
+    }
+
+    // today's customer invoices by status — the accounting view of the day.
+    // Every row is checkable in Odoo → Accounting → Customer Invoices.
+    function renderInvToday(orderedToday) {
+      const box = document.getElementById("invTodayBox");
+      if (!invToday) { box.innerHTML = `<div class="empty">${D.t("loading")}</div>`; return; }
+      const t = invToday;
+      const row = (label, b, cls) => `<tr${cls ? ` class="${cls}"` : ""}>
+        <td class="strong">${label}</td>
+        <td class="amt">${D.fmtNum(b.n)}</td>
+        <td class="amt">${D.fmtMoney(b.value)}</td>
+        <td class="amt">${b.residual > 0 ? `<span class="danger">${D.fmtMoney(b.residual)}</span>` : `<span class="muted">0</span>`}</td>
+      </tr>`;
+      const gap = Math.max(0, num(orderedToday) - num(t.posted.value));
+      box.innerHTML = `
+        <table class="dt">
+          <thead><tr><th>${D.t("ack_status")}</th><th>${D.t("col_count")}</th><th>${D.t("col_amount")}</th><th>${D.t("col_still_unpaid")}</th></tr></thead>
+          <tbody>
+            ${row("<b>" + D.t("st_posted_tot") + "</b>", t.posted)}
+            ${row(`<span class="ok">✓ ${D.t("st_paid")}</span>`, t.paid)}
+            ${row(D.t("st_partial"), t.partial)}
+            ${row(D.t("st_unpaid"), t.unpaid)}
+            ${row(`<span class="muted">${D.t("st_cancelled_inv")}</span>`, t.cancelled, "")}
+          </tbody>
+        </table>
+        <div class="muted" style="padding:9px 14px;font-size:12px">
+          <span class="ok">${D.fmtMoney(num(t.collected_today))}</span> ${D.t("collected_same_day")}
+          ${gap > 0 ? ` · ${D.fmtMoney(gap)} ${D.t("inv_gap_note")}` : ""}
+        </div>`;
     }
 
     // cash physically in transit, grouped by the courier journal that holds it

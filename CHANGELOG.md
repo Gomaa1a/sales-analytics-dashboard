@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-07-13 — Invoiced-today (accounting view) + city from partner data (v37)
+
+- **"Invoiced today" KPI** replaces the order-value KPI in the today strip:
+  posted customer invoices dated today, with same-day collection %. Verified
+  against the Odoo screen: 174 posted = 94 not paid / 47 paid / 33 partial,
+  6 cancelled, 66.96M — exact match (7/7 fixture tests).
+- **"Today's invoices by status" table**: posted / paid / partially paid /
+  not paid / cancelled × count · value · still-unpaid, with same-day
+  collected and the not-yet-invoiced gap underneath.
+- **"Due within 7 days"** line in the overdue card — money to chase BEFORE
+  it becomes overdue.
+- **City strictly from partner data (n8n v5.4)**: customer fetches add
+  `city_id` (the res.city dropdown — likely why 26% looked city-less);
+  resolved city = free-text city else dropdown name. Regions/Overview embed
+  the customer master's governorate+city through the FK and prefer them
+  over the per-order snapshot.
+- Cache-bust v=37.
+
 ## 2026-07-12 — Remove "Confirmed, not invoiced" (v36)
 
 - Removed by owner request: the Overview exec card and the Debt-page KPI;

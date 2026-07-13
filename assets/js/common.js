@@ -50,6 +50,19 @@
       sec_names: "٣ · الأسماء — بمن نتصل اليوم؟",
       sec_rhythm: "٤ · الإيقاع — إلى أين نتجه؟",
       sec_who: "٥ · النقد والعملاء — من يحمل أموالنا الآن؟",
+      inv_today: "المفوتر اليوم (فواتير مرحّلة)",
+      inv_today_tbl: "فواتير اليوم حسب الحالة",
+      st_posted_tot: "مرحّلة (الإجمالي)",
+      st_paid: "مدفوعة",
+      st_partial: "مدفوعة جزئياً",
+      st_unpaid: "غير مدفوعة",
+      st_cancelled_inv: "ملغاة",
+      invoices_w: "فاتورة",
+      col_count: "العدد",
+      col_still_unpaid: "المتبقي",
+      collected_same_day: "حُصّل في نفس اليوم",
+      inv_gap_note: "طلبات مؤكدة اليوم لم تُفوتر بعد",
+      due_7d: "يستحق خلال ٧ أيام",
       ov_vs_typical: "عن معدل نفس اليوم (٤ أسابيع)",
       ov_stuck: "أقدم من ٣ أيام",
       ov_today_orders: "طلبات اليوم (كما في أودو)",
@@ -300,6 +313,19 @@
       sec_names: "3 · Names — who do we call today?",
       sec_rhythm: "4 · Rhythm — which way are we trending?",
       sec_who: "5 · Cash & customers — who holds our money right now?",
+      inv_today: "Invoiced today (posted)",
+      inv_today_tbl: "Today's invoices by status",
+      st_posted_tot: "Posted (total)",
+      st_paid: "Paid",
+      st_partial: "Partially paid",
+      st_unpaid: "Not paid",
+      st_cancelled_inv: "Cancelled",
+      invoices_w: "invoices",
+      col_count: "Count",
+      col_still_unpaid: "Still unpaid",
+      collected_same_day: "collected same day",
+      inv_gap_note: "confirmed today, not yet invoiced",
+      due_7d: "Due within 7 days",
       ov_vs_typical: "vs 4-week same-weekday avg",
       ov_stuck: "older than 3 days",
       ov_today_orders: "Orders today (as in Odoo)",
@@ -763,7 +789,8 @@
     // aging buckets in IQD: le30 = not yet due or ≤30 days late,
     // 31–60 late, >60 late, unknown = no due date on the invoice
     const dso_buckets = { le30: 0, b31_60: 0, gt60: 0, unknown: 0 };
-    let overdue_total = 0, exposure = 0;
+    const due7End = addDays(today, 7);
+    let overdue_total = 0, exposure = 0, due_7d = 0;
     inv.forEach(i => {
       const amt = num2(i.amount_residual);
       exposure += amt;
@@ -771,6 +798,9 @@
       if (!due) { dso_buckets.unknown += amt; return; }
       const late = Math.round((Date.parse(today) - Date.parse(due)) / 864e5);
       if (late > 0) overdue_total += amt;
+      // the collections calendar: money coming due in the next 7 days —
+      // what reps should chase BEFORE it becomes overdue
+      if (late <= 0 && due < due7End) due_7d += amt;
       if (late > 60) dso_buckets.gt60 += amt;
       else if (late > 30) dso_buckets.b31_60 += amt;
       else dso_buckets.le30 += amt;
@@ -786,9 +816,39 @@
       customers_evaluated: cust.size,
       overdue_total: overdue_total,
       credit_exposure: exposure,
+      due_7d: due_7d,
       dso_buckets, overdue_customers,
       new_risk_value: sumV(risk), new_risk_count: risk.length
     };
+  }
+
+  // Today's customer invoices (INV/ documents dated today), classified the
+  // way Odoo's badges do: cancelled (state) · paid (residual 0) · partially
+  // paid (0 < residual < total) · not paid (residual = total). Also returns
+  // how much of today's invoicing was ALREADY collected today.
+  async function buildInvoicesToday() {
+    const today = bagToday();
+    const rows = dedupeBy(await sbGetAll(
+      `dashboard_invoices?select=invoice_id,name,amount_total,amount_residual,state` +
+      `&invoice_date=eq.${today}&name=like.INV*`), "invoice_id");
+    const num2 = n => Number(n) || 0;
+    const bucket = () => ({ n: 0, value: 0, residual: 0 });
+    const out = { posted: bucket(), paid: bucket(), partial: bucket(), unpaid: bucket(), cancelled: bucket() };
+    let collected = 0;
+    for (const x of rows) {
+      const t = num2(x.amount_total), res = num2(x.amount_residual);
+      const add = b => { b.n++; b.value += t; b.residual += res; };
+      if (x.state === "cancel") { add(out.cancelled); continue; }
+      if (x.state !== "posted") continue; // drafts don't count anywhere
+      add(out.posted);
+      collected += t - res;
+      if (res === 0) add(out.paid);
+      else if (res < t) add(out.partial);
+      else add(out.unpaid);
+    }
+    return { generated_at: new Date().toISOString(), currency: CFG.CURRENCY, today,
+      posted: out.posted, paid: out.paid, partial: out.partial,
+      unpaid: out.unpaid, cancelled: out.cancelled, collected_today: collected };
   }
 
   // The adapters aggregate thousands of rows — recomputing them on every
@@ -810,6 +870,7 @@
     if (endpointKey === "rep_collections") return cachedApi("rep_collections", buildRepCollections);
     if (endpointKey === "rep_debt") return cachedApi("rep_debt", buildRepDebt);
     if (endpointKey === "collections") return cachedApi("collections", buildCollections);
+    if (endpointKey === "invoices_today") return buildInvoicesToday(); // uncached: it IS today
 
     if (endpointKey === "acks") {
       const rows = await sbGet(`alert_acks?select=order_id,order_name,level,amount_total,note,created_at&order=created_at.desc&limit=2000`);
