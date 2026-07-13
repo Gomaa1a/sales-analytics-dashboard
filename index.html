@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Sales Command Center</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=37" />
+  <link rel="stylesheet" href="assets/css/style.css?v=38" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -91,9 +91,9 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=37"></script>
-  <script src="assets/js/auth.js?v=37"></script>
-  <script src="assets/js/common.js?v=37"></script>
+  <script src="assets/js/config.js?v=38"></script>
+  <script src="assets/js/auth.js?v=38"></script>
+  <script src="assets/js/common.js?v=38"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -126,7 +126,7 @@
     const TARGET = num(TARGETS.MONTHLY_REVENUE_TARGET);
 
     let dayChart = null, custChart = null, weekChart = null;
-    let allRows = [], payments = [], debtRows = [], alerts = [], collSnap = null, invToday = null;
+    let allRows = [], payments = [], debtRows = [], alerts = [], collSnap = null, invToday = null, invMonth = null;
     let loadedFrom = null, loadedTo = null;
 
     // Baghdad calendar anchors
@@ -182,6 +182,7 @@
       try { const a = await D.api("alerts"); alerts = a.alerts || []; } catch (e) { alerts = []; }
       try { collSnap = await D.api("collections"); } catch (e) { collSnap = null; }
       try { invToday = await D.api("invoices_today"); } catch (e) { invToday = null; }
+      try { invMonth = await D.api("invoices_month"); } catch (e) { invMonth = null; }
     }
 
     const kpi = (cls, label, n, sub) =>
@@ -212,27 +213,23 @@
 
       // ----- month-anchored slice (drives the hero band) -----
       const confAll = allRows.filter(o => isConf(o) && matchRC(o));
-      const revMonth = confAll.filter(o => inMonth(o, thisMonth)).reduce((s, o) => s + val(o), 0);
-      // MoM compares month-to-date vs the SAME number of days of last month —
-      // comparing a partial month to a full one always reads as a crash.
-      const domN = Number(today.slice(8, 10));
-      const revLast = confAll.filter(o => {
-        const d = dayOf(o);
-        return d.slice(0, 7) === lastMonth && Number(d.slice(8, 10)) <= domN;
-      }).reduce((s, o) => s + val(o), 0);
-      const momRev = pctOf(revMonth, revLast);
-      // only claim a MoM change when the data actually covers the compared
-      // days (the sync's history starts mid-June 2026 — an empty early-June
-      // would otherwise show an absurd +5000%)
-      const firstDataDay = confAll.reduce((m, o) => { const d = dayOf(o); return d && d < m ? d : m; }, "9999");
-      const momValid = revLast > 0 && firstDataDay <= lastMonthStart;
-      const attain = TARGET > 0 ? Math.round(revMonth / TARGET * 100) : null;
-      const pace = dayOfMonth > 0 ? Math.round(revMonth / dayOfMonth * daysInMonth) : revMonth;
-      const paceVs = TARGET > 0 ? Math.round(pace / TARGET * 100) : null;
+      // The month card is INVOICE-based (accounting revenue, by owner
+      // request): posted customer invoices dated this month. MoM compares
+      // vs the SAME number of days of last month, and only shows when last
+      // month's invoices actually exist in the table (needs the v5.5
+      // "BACKFILL Months" run once).
+      const revMonth = invMonth ? num(invMonth.value) : null;
+      const momRev = invMonth ? pctOf(num(invMonth.value), num(invMonth.last_mtd)) : 0;
+      const momValid = !!(invMonth && invMonth.last_month_has_data && num(invMonth.last_mtd) > 0);
+      const attain = (TARGET > 0 && revMonth != null) ? Math.round(revMonth / TARGET * 100) : null;
+      const pace = (revMonth != null && dayOfMonth > 0) ? Math.round(revMonth / dayOfMonth * daysInMonth) : revMonth;
+      const paceVs = (TARGET > 0 && pace != null) ? Math.round(pace / TARGET * 100) : null;
 
       const paysRC = payments.filter(p => fb.match(p, { rep: "salesperson", cust: "partner_name" }));
+      // cash card: straight sum of dashboard_payments (excl. cancelled) —
+      // the same basis as the today's-cash KPI
       const cashMonth = paysRC.filter(p => String(p.date).slice(0, 7) === thisMonth).reduce((s, p) => s + num(p.amount), 0);
-      const vsSales = revMonth > 0 ? Math.round(cashMonth / revMonth * 100) : null;
+      const vsSales = (revMonth != null && revMonth > 0) ? Math.round(cashMonth / revMonth * 100) : null;
 
       // ----- TODAY strip (always today, respects rep/customer filter) -----
       const salesTodayRows = confAll.filter(o => dayOf(o) === today);
@@ -293,7 +290,9 @@
       const targetBlock = TARGET > 0
         ? `<div class="ex-bar ${barCls}"><i style="width:${Math.min(attain, 100)}%"></i></div>
            <div class="ex-sub"><b>${attain}%</b> ${D.t("ex_of_target")} (${D.fmtMoney(TARGET)}) · ${D.t("ex_pace")} <b>${D.fmtMoney(pace)}</b> (${paceVs}%)${momNote}</div>`
-        : `<div class="ex-sub" style="margin-top:8px">${D.fmtNum(confAll.filter(o => inMonth(o, thisMonth)).length)} ${D.t("orders")}${momNote}</div>`;
+        : `<div class="ex-sub" style="margin-top:8px">${invMonth
+            ? `${D.fmtNum(invMonth.count)} ${D.t("invoices_w")} · ${D.t("ex_rev_collected")}: <b>${D.fmtMoney(num(invMonth.collected))}</b>`
+            : D.t("loading")}${momNote}</div>`;
 
       // receivables aging + total exposure — from the collections snapshot the
       // page already downloads (label the basis: "as of latest snapshot")
@@ -315,7 +314,7 @@
         : "");
 
       document.getElementById("execHeads").innerHTML =
-        card(D.t("ex_revenue"), D.fmtMoney(revMonth), momValid ? deltaTag(momRev) : "") + targetBlock + `</div>` +
+        card(D.t("ex_revenue"), revMonth != null ? D.fmtMoney(revMonth) : "—", momValid ? deltaTag(momRev) : "") + targetBlock + `</div>` +
         card(D.t("ex_cash"), D.fmtMoney(cashMonth), "") +
           `<div class="ex-sub" style="margin-top:9px">${D.t("coll_vs_sales")}: <b>${vsSales != null ? vsSales + "%" : "—"}</b></div></div>` +
         `<div class="exec-card"><div class="ex-l">${D.t("ex_overdue")}</div><div class="exec-row"><div class="exec-n" style="color:var(--red)">${D.fmtMoney(overdue)}</div></div>` +
@@ -364,7 +363,7 @@
       document.getElementById("varSub").innerHTML = `${D.fmtNum(crit.length)} ${D.t("ex_var_sub")}`;
 
       // ----- narrative -----
-      document.getElementById("storyText").innerHTML = buildStory({ revMonth, momRev, hasLast: revLast > 0, attain, pace, vsSales, overdue, conc, topGov, govShare });
+      document.getElementById("storyText").innerHTML = buildStory({ revMonth, momRev, hasLast: momValid, attain, pace, vsSales, overdue, conc, topGov, govShare });
 
       // ----- action tables + charts -----
       // each section individually guarded: one failure logs to the console
@@ -532,18 +531,18 @@
       const m = D.fmtMoney;
       const dir = p => p >= 0 ? "▲" : "▼";
       if (D.isAR()) {
-        let s = `المبيعات المؤكدة هذا الشهر <b>${m(x.revMonth)}</b>`;
+        let s = `المفوتر هذا الشهر <b>${x.revMonth != null ? m(x.revMonth) : "—"}</b>`;
         if (x.hasLast) s += ` (${dir(x.momRev)} ${Math.abs(x.momRev)}% عن نفس الأيام من الشهر الماضي)`;
         if (x.attain != null) s += `، أي <b>${x.attain}%</b> من الهدف، والمتوقّع <b>${m(x.pace)}</b> بنهاية الشهر`;
-        if (x.vsSales != null) s += `. التحصيل <b>${x.vsSales}%</b> من المبيعات`;
+        if (x.vsSales != null) s += `. التحصيل <b>${x.vsSales}%</b> من المفوتر`;
         if (x.overdue > 0) s += `، والمتأخرات <b>${m(x.overdue)}</b> يتركّز <b>${x.conc}%</b> منها في أكبر ١٠ عملاء`;
         if (x.topGov) s += `. أعلى محافظة: <b>${D.esc(x.topGov[0])}</b> (${x.govShare}%)`;
         return s + ".";
       }
-      let s = `Confirmed sales this month are <b>${m(x.revMonth)}</b>`;
+      let s = `Invoiced this month is <b>${x.revMonth != null ? m(x.revMonth) : "—"}</b>`;
       if (x.hasLast) s += ` (${dir(x.momRev)} ${Math.abs(x.momRev)}% vs same days last month)`;
       if (x.attain != null) s += `, i.e. <b>${x.attain}%</b> of target, on pace for <b>${m(x.pace)}</b> by month-end`;
-      if (x.vsSales != null) s += `. Cash collected is <b>${x.vsSales}%</b> of sales`;
+      if (x.vsSales != null) s += `. Cash collected is <b>${x.vsSales}%</b> of invoiced`;
       if (x.overdue > 0) s += `, and overdue of <b>${m(x.overdue)}</b> is <b>${x.conc}%</b> concentrated in the top 10 customers`;
       if (x.topGov) s += `. Top governorate: <b>${D.esc(x.topGov[0])}</b> (${x.govShare}%)`;
       return s + ".";

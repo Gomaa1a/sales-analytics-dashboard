@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-07-13 — Month card on invoice basis (v38)
+
+- **"Invoiced — this month (posted)"** replaces the order-based month
+  revenue card: Σ posted invoices this month, MoM vs same days of last
+  month (invoice basis), sub-line = invoice count + collected-so-far.
+  Story line + "Collected ÷ invoiced" updated to match.
+- Cash collected — this month: unchanged, confirmed already payment-based
+  (dashboard_payments, same basis as the today KPI).
+- **n8n v5.5**: adds a one-click "BACKFILL Months" branch (all receivable
+  items dated since the 1st of last month, paid included) — required once,
+  because the ledger backfill fetched only OPEN items and early-month paid
+  invoices are missing (pre-backfill July shows 490.9M / 1,092 invoices).
+- 4/4 fixture tests (month bucketing, same-days MoM, collected).
+  Cache-bust v=38.
+
 ## 2026-07-13 — Invoiced-today (accounting view) + city from partner data (v37)
 
 - **"Invoiced today" KPI** replaces the order-value KPI in the today strip:
