@@ -86,6 +86,25 @@ Debt is computed from the **receivable LEDGER open items**
 The ledger (journal items) is the complete transactional truth; every row
 matches Odoo → Accounting → Partner Ledger.
 
+## Invoiced today (Overview, 2026-07-13)
+From `dashboard_invoices`, INV/ documents with `invoice_date = today`:
+- **Invoiced today** = Σ `amount_total` of POSTED invoices (accounting
+  basis, tax-inclusive — deliberately different from the order-based month
+  band, and labeled as such).
+- **Status split** = cancelled (`state`), paid (residual 0), partially paid
+  (0 < residual < total), not paid (residual = total). Drafts ignored.
+- **Collected same-day** = Σ (total − residual) over today's posted rows.
+- **Invoicing gap note** = today's confirmed ORDER value − invoiced value.
+- **Due within 7 days** (overdue card) = open residuals with
+  today ≤ due_date < today+7 — the pre-overdue collections calendar.
+Phase-2 ideas: weekly invoiced-revenue trend (needs history to accumulate),
+avg days-to-pay (needs payment-date sync).
+
+## City preference chain (2026-07-13 — partner data only)
+governorate (`res.partner.state_id`) → customer master `city`
+(free-text `city`, else the `city_id` dropdown name — synced by n8n v5.4)
+→ the order's own city snapshot → "no city". No name-guessing.
+
 ## Raw-table adapter bases (2026-07 restructure — snapshots retired)
 - **14-day collections grid** = `dashboard_payments` rows of the last 14
   Baghdad days; paid = state `paid`, pending = state `in_process`.
