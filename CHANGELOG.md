@@ -1,5 +1,39 @@
 # Changelog
 
+## 2026-07-14 — Per-rep invoices: Collected column + rep filter (v40)
+
+- **"Today's invoices by salesperson"** gains a **Collected** column
+  (amount − still unpaid), matching the owner's verification SQL
+  one-for-one (salesperson · invoices · amount · still_unpaid · collected).
+- The table now honors the page's **salesperson filter**: matched by
+  `user_id` resolved from the loaded orders (order and invoice rep names
+  can spell differently), with name equality as fallback.
+- The rep dropdown now also includes today's invoice reps — after a data
+  reset the orders table can be empty and the dropdown used to be too.
+- Cache-bust v=40.
+
+## 2026-07-14 — n8n v6: raw mirror 2026 (no dashboard asset changes)
+
+- **"Dabboos Sync v6 — raw mirror 2026"**: n8n's only job is to mirror raw
+  Odoo rows into the 4 Supabase tables from 2026-01-01, upserting on primary
+  keys (duplicates impossible). The dashboard becomes a query machine over
+  complete raw data.
+- **Salesperson in ONE node**: the instance has a custom `salesperson_id`
+  field directly on `account.move.line`, so the v5.6 `account.move` join is
+  gone. (Root cause of the v5.6 slowness found: an n8n node executes once
+  per incoming item, so "Odoo Invoice Moves" re-ran its window query once
+  per invoice line.)
+- **Payments prune removed** — payment history accumulates.
+- **FULL BACKFILL 2026** (manual, run once after `supabase/reset-data.sql`
+  wipes the data tables): customers → orders (scored against the fresh
+  master) → payments → invoice lines (2026 slice + ALL-open slice deduped —
+  pre-2026 open receivables are today's real debt). 1,000-row upsert chunks;
+  collapse nodes keep every Odoo fetch single-shot.
+- `supabase/reset-data.sql` added (truncates the 4 data tables +
+  salespeople; never touches auth/acks/traffic).
+- Verified: structure assertions + fixture simulations of every new/changed
+  Code node, including the user's real `salesperson_id` sample rows.
+
 ## 2026-07-14 — Salesperson on invoices (v39)
 
 - **`dashboard_invoices.salesperson`** (new column, `add-invoices.sql`):
