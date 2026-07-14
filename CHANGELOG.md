@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-07-15 — Fix: false "Unassigned" on the debt views (v41)
+
+- `debtorsFromInvoices` stamped each customer's rep from the FIRST open
+  line it met; when that line was a payment/credit (those carry no
+  salesperson), the customer showed as Unassigned even though their
+  invoice lines named a rep — found by the owner comparing against a
+  Supabase query. Now any later line with a rep fills a missing
+  `salesperson`/`user_id`. Customer-master rep still wins when present.
+- Affects the Debt page, Overview top-debtors, and rep-debt groupings.
+- Cache-bust v=41.
+
 ## 2026-07-14 — Per-rep invoices: Collected column + rep filter (v40)
 
 - **"Today's invoices by salesperson"** gains a **Collected** column

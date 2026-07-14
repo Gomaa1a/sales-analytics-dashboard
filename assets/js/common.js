@@ -739,6 +739,11 @@
         });
       }
       const e = cust.get(pid);
+      // a customer's FIRST open line can be a payment/credit (no salesperson
+      // on those) — let any later line with a rep fill the blanks, or a
+      // customer with named invoice lines shows as Unassigned
+      if (e.salesperson == null && i.salesperson) e.salesperson = i.salesperson;
+      if (e.user_id == null && i.user_id != null) e.user_id = i.user_id;
       const amt = Number(i.amount_residual) || 0;
       e.receivable += amt;
       const due = i.due_date ? String(i.due_date).slice(0, 10) : "";
