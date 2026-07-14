@@ -63,6 +63,8 @@
       collected_same_day: "حُصّل في نفس اليوم",
       inv_gap_note: "طلبات مؤكدة اليوم لم تُفوتر بعد",
       inv_by_rep: "فواتير اليوم حسب المندوب",
+      inv_by_rep_month: "فواتير الشهر حسب المندوب",
+      collected_so_far: "حُصّل حتى الآن",
       col_collected: "المحصّل",
       due_7d: "يستحق خلال ٧ أيام",
       ov_vs_typical: "عن معدل نفس اليوم (٤ أسابيع)",
@@ -329,6 +331,8 @@
       collected_same_day: "collected same day",
       inv_gap_note: "confirmed today, not yet invoiced",
       inv_by_rep: "Today's invoices by salesperson",
+      inv_by_rep_month: "This month's invoices by salesperson",
+      collected_so_far: "collected so far",
       col_collected: "Collected",
       due_7d: "Due within 7 days",
       ov_vs_typical: "vs 4-week same-weekday avg",
@@ -918,17 +922,32 @@
     const domN = Number(today.slice(8, 10));
     const lastMonthStart = addDays(thisMonth + "-01", -1).slice(0, 7) + "-01";
     const lastMonth = lastMonthStart.slice(0, 7);
-    const rows = dedupeBy(await sbGetAll(
-      `dashboard_invoices?select=invoice_id,amount_total,amount_residual,state,invoice_date` +
-      `&invoice_date=gte.${lastMonthStart}&name=like.INV*&state=eq.posted`), "invoice_id");
+    const [rowsRaw, repNames] = await Promise.all([
+      sbGetAll(
+        `dashboard_invoices?select=invoice_id,user_id,salesperson,amount_total,amount_residual,state,invoice_date` +
+        `&invoice_date=gte.${lastMonthStart}&name=like.INV*&state=eq.posted`),
+      cachedApi("rep_names", loadRepNames)
+    ]);
+    const rows = dedupeBy(rowsRaw, "invoice_id");
     const num2 = n => Number(n) || 0;
+    const reps = new Map();
     let value = 0, count = 0, collected = 0, lastMTD = 0, lastAny = 0;
     for (const x of rows) {
       const d = String(x.invoice_date).slice(0, 10);
       const t = num2(x.amount_total);
       if (d.slice(0, 7) === thisMonth) {
         value += t; count++;
-        collected += t - num2(x.amount_residual);
+        const res = num2(x.amount_residual);
+        collected += t - res;
+        // per-rep slice of the month's posted book (same keying as today's)
+        const rk = x.user_id != null ? x.user_id : (x.salesperson || "—");
+        if (!reps.has(rk)) reps.set(rk, {
+          user_id: x.user_id != null ? x.user_id : null,
+          salesperson: x.salesperson || repNames.get(x.user_id) ||
+            (x.user_id != null ? "ID " + x.user_id : "— غير محدد / Unassigned"),
+          n: 0, value: 0, residual: 0
+        });
+        const r = reps.get(rk); r.n++; r.value += t; r.residual += res;
       } else if (d.slice(0, 7) === lastMonth) {
         lastAny += t;
         if (Number(d.slice(8, 10)) <= domN) lastMTD += t;
@@ -936,7 +955,8 @@
     }
     return { generated_at: new Date().toISOString(), currency: CFG.CURRENCY,
       month: thisMonth, value, count, collected,
-      last_mtd: lastMTD, last_month_has_data: lastAny > 0 };
+      last_mtd: lastMTD, last_month_has_data: lastAny > 0,
+      by_rep: [...reps.values()].sort((a, b) => b.value - a.value) };
   }
 
   async function api(endpointKey, params) {

@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-07-15 — "This month's invoices by salesperson" (v42)
+
+- New panel under the month exec band: month-to-date POSTED invoices per
+  rep (count · amount · still unpaid · collected) — the monthly twin of
+  the invoiced-today table, same basis (`buildInvoicesMonth` now returns
+  `by_rep`; 4-min cache as before).
+- Footer: month, invoice count, collected-so-far.
+- Both per-rep tables share one row/header builder and honor the page's
+  salesperson filter (user_id match, name fallback).
+- Cache-bust v=42.
+
 ## 2026-07-15 — Fix: false "Unassigned" on the debt views (v41)
 
 - `debtorsFromInvoices` stamped each customer's rep from the FIRST open
