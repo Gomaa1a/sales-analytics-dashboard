@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Sales Command Center</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=38" />
+  <link rel="stylesheet" href="assets/css/style.css?v=39" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -91,9 +91,9 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=38"></script>
-  <script src="assets/js/auth.js?v=38"></script>
-  <script src="assets/js/common.js?v=38"></script>
+  <script src="assets/js/config.js?v=39"></script>
+  <script src="assets/js/auth.js?v=39"></script>
+  <script src="assets/js/common.js?v=39"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -447,6 +447,14 @@
         <td class="amt">${b.residual > 0 ? `<span class="danger">${D.fmtMoney(b.residual)}</span>` : `<span class="muted">0</span>`}</td>
       </tr>`;
       const gap = Math.max(0, num(orderedToday) - num(t.posted.value));
+      // per-salesperson slice of today's POSTED book (names come from the
+      // customer master — DB strings, so they go through D.esc)
+      const repRows = (t.by_rep || []).map(r => `<tr>
+        <td class="strong">${D.esc(r.salesperson)}</td>
+        <td class="amt">${D.fmtNum(r.n)}</td>
+        <td class="amt">${D.fmtMoney(r.value)}</td>
+        <td class="amt">${r.residual > 0 ? `<span class="danger">${D.fmtMoney(r.residual)}</span>` : `<span class="muted">0</span>`}</td>
+      </tr>`).join("");
       box.innerHTML = `
         <table class="dt">
           <thead><tr><th>${D.t("ack_status")}</th><th>${D.t("col_count")}</th><th>${D.t("col_amount")}</th><th>${D.t("col_still_unpaid")}</th></tr></thead>
@@ -461,7 +469,13 @@
         <div class="muted" style="padding:9px 14px;font-size:12px">
           <span class="ok">${D.fmtMoney(num(t.collected_today))}</span> ${D.t("collected_same_day")}
           ${gap > 0 ? ` · ${D.fmtMoney(gap)} ${D.t("inv_gap_note")}` : ""}
-        </div>`;
+        </div>
+        ${repRows ? `
+        <div class="panel-head" style="border-top:1px solid var(--bdr)"><h2>${D.t("inv_by_rep")}</h2></div>
+        <table class="dt">
+          <thead><tr><th>${D.t("col_rep")}</th><th>${D.t("col_count")}</th><th>${D.t("col_amount")}</th><th>${D.t("col_still_unpaid")}</th></tr></thead>
+          <tbody>${repRows}</tbody>
+        </table>` : ""}`;
     }
 
     // cash physically in transit, grouped by the courier journal that holds it

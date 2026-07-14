@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-07-14 — Salesperson on invoices (v39)
+
+- **`dashboard_invoices.salesperson`** (new column, `add-invoices.sql`):
+  the Odoo `invoice_user_id` name snapshot. Requires **n8n v5.6** to map
+  `invoice_user_id[1] → salesperson` in the invoice sync + one backfill
+  run; run the `alter table` BEFORE deploying this JS (it selects the
+  column) or the invoice cards 400.
+- **"Today's invoices by salesperson"**: the invoiced-today card gains a
+  per-rep table (count · amount · still unpaid) over today's POSTED
+  invoices — rows sum to the posted total; cancelled/drafts excluded.
+  Name = invoice `salesperson`, else customer-master assigned rep (cached
+  4 min) for pre-backfill rows, else "ID n". Names are `D.esc`-escaped.
+- Debt attribution unchanged (assigned rep first), but the invoice's
+  salesperson now backfills missing names in the debt views.
+- Cache-bust v=39.
+
 ## 2026-07-13 — Month card on invoice basis (v38)
 
 - **"Invoiced — this month (posted)"** replaces the order-based month

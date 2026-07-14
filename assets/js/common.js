@@ -62,6 +62,7 @@
       col_still_unpaid: "المتبقي",
       collected_same_day: "حُصّل في نفس اليوم",
       inv_gap_note: "طلبات مؤكدة اليوم لم تُفوتر بعد",
+      inv_by_rep: "فواتير اليوم حسب المندوب",
       due_7d: "يستحق خلال ٧ أيام",
       ov_vs_typical: "عن معدل نفس اليوم (٤ أسابيع)",
       ov_stuck: "أقدم من ٣ أيام",
@@ -326,6 +327,7 @@
       col_still_unpaid: "Still unpaid",
       collected_same_day: "collected same day",
       inv_gap_note: "confirmed today, not yet invoiced",
+      inv_by_rep: "Today's invoices by salesperson",
       due_7d: "Due within 7 days",
       ov_vs_typical: "vs 4-week same-weekday avg",
       ov_stuck: "older than 3 days",
@@ -708,7 +710,7 @@
     // subtract, or every customer's debt reads too high. This mirrors
     // Odoo's Aged Receivable, which nets both signs per bucket.
     return dedupeBy(await sbGetAll(
-      `dashboard_invoices?select=invoice_id,partner_id,partner_name,user_id,amount_residual,due_date` +
+      `dashboard_invoices?select=invoice_id,partner_id,partner_name,user_id,salesperson,amount_residual,due_date` +
       `&state=eq.posted&amount_residual=neq.0`), "invoice_id");
   }
   async function loadCustomerIdentity() {
@@ -728,7 +730,9 @@
           name: c.complete_name || i.partner_name || "—",
           city: c.governorate || c.city || "",
           user_id: c.user_id != null ? c.user_id : (i.user_id != null ? i.user_id : null),
-          salesperson: c.salesperson || null,
+          // assigned rep from the customer master first (debt is attributed
+          // to the account owner); the invoice's own salesperson as fallback
+          salesperson: c.salesperson || i.salesperson || null,
           receivable: 0, overdue: 0, oldestLate: 0
         });
       }
@@ -824,18 +828,37 @@
     };
   }
 
+  // Fallback names for invoice rows synced before the `salesperson` column
+  // existed (pre n8n v5.6 / before the backfill): resolve the invoice's
+  // user_id → rep name via the customer master's assigned rep.
+  async function loadRepNames() {
+    const rows = await sbGetAll(
+      `dashboard_customers?select=user_id,salesperson&user_id=not.is.null`);
+    const m = new Map();
+    rows.forEach(r => {
+      if (r.user_id != null && r.salesperson && !m.has(r.user_id)) m.set(r.user_id, r.salesperson);
+    });
+    return m;
+  }
+
   // Today's customer invoices (INV/ documents dated today), classified the
   // way Odoo's badges do: cancelled (state) · paid (residual 0) · partially
   // paid (0 < residual < total) · not paid (residual = total). Also returns
-  // how much of today's invoicing was ALREADY collected today.
+  // how much of today's invoicing was ALREADY collected today, and the
+  // posted book broken down per salesperson.
   async function buildInvoicesToday() {
     const today = bagToday();
-    const rows = dedupeBy(await sbGetAll(
-      `dashboard_invoices?select=invoice_id,name,amount_total,amount_residual,state` +
-      `&invoice_date=eq.${today}&name=like.INV*`), "invoice_id");
+    const [rowsRaw, repNames] = await Promise.all([
+      sbGetAll(
+        `dashboard_invoices?select=invoice_id,name,user_id,salesperson,amount_total,amount_residual,state` +
+        `&invoice_date=eq.${today}&name=like.INV*`),
+      cachedApi("rep_names", loadRepNames)
+    ]);
+    const rows = dedupeBy(rowsRaw, "invoice_id");
     const num2 = n => Number(n) || 0;
     const bucket = () => ({ n: 0, value: 0, residual: 0 });
     const out = { posted: bucket(), paid: bucket(), partial: bucket(), unpaid: bucket(), cancelled: bucket() };
+    const reps = new Map();
     let collected = 0;
     for (const x of rows) {
       const t = num2(x.amount_total), res = num2(x.amount_residual);
@@ -847,10 +870,21 @@
       if (res === 0) add(out.paid);
       else if (res < t) add(out.partial);
       else add(out.unpaid);
+      const rk = x.user_id != null ? x.user_id : (x.salesperson || "—");
+      if (!reps.has(rk)) reps.set(rk, {
+        user_id: x.user_id != null ? x.user_id : null,
+        // the invoice's own name snapshot wins; customer-master fallback
+        // covers rows synced before the column existed
+        salesperson: x.salesperson || repNames.get(x.user_id) ||
+          (x.user_id != null ? "ID " + x.user_id : "— غير محدد / Unassigned"),
+        n: 0, value: 0, residual: 0
+      });
+      add(reps.get(rk));
     }
     return { generated_at: new Date().toISOString(), currency: CFG.CURRENCY, today,
       posted: out.posted, paid: out.paid, partial: out.partial,
-      unpaid: out.unpaid, cancelled: out.cancelled, collected_today: collected };
+      unpaid: out.unpaid, cancelled: out.cancelled, collected_today: collected,
+      by_rep: [...reps.values()].sort((a, b) => b.value - a.value) };
   }
 
   // The adapters aggregate thousands of rows — recomputing them on every
