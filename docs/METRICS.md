@@ -105,6 +105,12 @@ From `dashboard_invoices`, INV/ documents with `invoice_date = today`:
 - **Status split** = cancelled (`state`), paid (residual 0), partially paid
   (0 < residual < total), not paid (residual = total). Drafts ignored.
 - **Collected same-day** = Σ (total − residual) over today's posted rows.
+- **By salesperson** (2026-07-14) = the POSTED slice grouped by the
+  invoice's `user_id` (Odoo `invoice_user_id`). Display name = the
+  invoice's own `salesperson` column (n8n v5.6 name snapshot), else the
+  customer master's assigned-rep name for rows synced before the column
+  existed, else "ID n". Cancelled/draft rows are excluded, so the per-rep
+  values sum to the posted total.
 - **Invoicing gap note** = today's confirmed ORDER value − invoiced value.
 - **Due within 7 days** (overdue card) = open residuals with
   today ≤ due_date < today+7 — the pre-overdue collections calendar.

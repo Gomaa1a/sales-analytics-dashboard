@@ -13,6 +13,7 @@ create table if not exists public.dashboard_invoices (
   partner_id      int8,
   partner_name    text,
   user_id         int8,
+  salesperson     text,          -- invoice_user_id display name from Odoo
   invoice_date    date,
   due_date        date,
   amount_total    numeric,
@@ -21,6 +22,12 @@ create table if not exists public.dashboard_invoices (
   state           text,
   updated_at      timestamptz not null default now()
 );
+
+-- 2026-07-14: salesperson name snapshot (account.move.invoice_user_id[1]).
+-- Idempotent — safe to run on databases created before this column existed.
+-- n8n must map it in the invoice sync AND a backfill run, or old rows stay
+-- null (the dashboard then falls back to the customer master's rep name).
+alter table public.dashboard_invoices add column if not exists salesperson text;
 
 create index if not exists dashboard_invoices_due_idx     on public.dashboard_invoices (due_date);
 create index if not exists dashboard_invoices_partner_idx on public.dashboard_invoices (partner_id);
