@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Sales Command Center</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=41" />
+  <link rel="stylesheet" href="assets/css/style.css?v=42" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -47,6 +47,10 @@
         </div>
       </div>
     </section>
+    <div class="panel" style="margin-bottom:16px">
+      <div class="panel-head"><h2 id="invMonthRepTitle"></h2></div>
+      <div class="panel-body" style="padding:0"><div id="invMonthRepBox"></div></div>
+    </div>
 
     <!-- Row 3 — NAMES: who to call, who is performing -->
     <h2 class="sect-h" id="secNames"></h2>
@@ -91,9 +95,9 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=41"></script>
-  <script src="assets/js/auth.js?v=41"></script>
-  <script src="assets/js/common.js?v=41"></script>
+  <script src="assets/js/config.js?v=42"></script>
+  <script src="assets/js/auth.js?v=42"></script>
+  <script src="assets/js/common.js?v=42"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -114,6 +118,7 @@
     document.getElementById("secRhythm").textContent = D.t("sec_rhythm");
     document.getElementById("secWho").textContent = D.t("sec_who");
     document.getElementById("invTodayTitle").textContent = D.t("inv_today_tbl");
+    document.getElementById("invMonthRepTitle").textContent = D.t("inv_by_rep_month");
 
     const isConf = o => o.state === "sale" || o.state === "done";
     const val = o => Number(o.amount_total) || 0;
@@ -282,6 +287,7 @@
           ` · <span class="${cancelledToday ? "danger" : "muted"}">${D.fmtNum(cancelledToday)} ${D.t("ov_not_confirmed")}</span>`);
 
       sect("invoices-today", () => renderInvToday(salesToday));
+      sect("invoices-month-reps", renderInvMonthReps);
 
       // ----- overdue / receivable (respect rep + customer filter) -----
       const debtRC = debtRows.filter(r => (!v.rep || r.salesperson === v.rep) && (!v.cust || String(r.name || "").toLowerCase().includes(v.cust)));
@@ -453,24 +459,7 @@
         <td class="amt">${b.residual > 0 ? `<span class="danger">${D.fmtMoney(b.residual)}</span>` : `<span class="muted">0</span>`}</td>
       </tr>`;
       const gap = Math.max(0, num(orderedToday) - num(t.posted.value));
-      // per-salesperson slice of today's POSTED book. Honors the page's rep
-      // filter: match by user_id (resolved from the loaded orders, since the
-      // dropdown holds ORDER rep spellings), falling back to name equality.
-      const v = fb.values();
-      let byRep = t.by_rep || [];
-      if (v.rep) {
-        const o = allRows.find(r => r.salesperson === v.rep && r.user_id != null);
-        const uid = o ? o.user_id : null;
-        byRep = byRep.filter(r => (uid != null && r.user_id === uid) || r.salesperson === v.rep);
-      }
-      // names are DB strings, so they go through D.esc
-      const repRows = byRep.map(r => `<tr>
-        <td class="strong">${D.esc(r.salesperson)}</td>
-        <td class="amt">${D.fmtNum(r.n)}</td>
-        <td class="amt">${D.fmtMoney(r.value)}</td>
-        <td class="amt">${r.residual > 0 ? `<span class="danger">${D.fmtMoney(r.residual)}</span>` : `<span class="muted">0</span>`}</td>
-        <td class="amt"><span class="ok">${D.fmtMoney(r.value - r.residual)}</span></td>
-      </tr>`).join("");
+      const repRows = repTableRows(t.by_rep);
       box.innerHTML = `
         <table class="dt">
           <thead><tr><th>${D.t("ack_status")}</th><th>${D.t("col_count")}</th><th>${D.t("col_amount")}</th><th>${D.t("col_still_unpaid")}</th></tr></thead>
@@ -489,9 +478,51 @@
         ${repRows ? `
         <div class="panel-head" style="border-top:1px solid var(--bdr)"><h2>${D.t("inv_by_rep")}</h2></div>
         <table class="dt">
-          <thead><tr><th>${D.t("col_rep")}</th><th>${D.t("col_count")}</th><th>${D.t("col_amount")}</th><th>${D.t("col_still_unpaid")}</th><th>${D.t("col_collected")}</th></tr></thead>
+          ${repTableHead()}
           <tbody>${repRows}</tbody>
         </table>` : ""}`;
+    }
+
+    // Shared by the today/month per-rep invoice tables.
+    // Honors the page's rep filter: the dropdown holds ORDER rep spellings,
+    // so match by user_id resolved from the loaded orders, falling back to
+    // name equality. Names are DB strings — they go through D.esc.
+    function repTableRows(byRep) {
+      const v = fb.values();
+      let list = byRep || [];
+      if (v.rep) {
+        const o = allRows.find(r => r.salesperson === v.rep && r.user_id != null);
+        const uid = o ? o.user_id : null;
+        list = list.filter(r => (uid != null && r.user_id === uid) || r.salesperson === v.rep);
+      }
+      return list.map(r => `<tr>
+        <td class="strong">${D.esc(r.salesperson)}</td>
+        <td class="amt">${D.fmtNum(r.n)}</td>
+        <td class="amt">${D.fmtMoney(r.value)}</td>
+        <td class="amt">${r.residual > 0 ? `<span class="danger">${D.fmtMoney(r.residual)}</span>` : `<span class="muted">0</span>`}</td>
+        <td class="amt"><span class="ok">${D.fmtMoney(r.value - r.residual)}</span></td>
+      </tr>`).join("");
+    }
+    const repTableHead = () =>
+      `<thead><tr><th>${D.t("col_rep")}</th><th>${D.t("col_count")}</th><th>${D.t("col_amount")}</th><th>${D.t("col_still_unpaid")}</th><th>${D.t("col_collected")}</th></tr></thead>`;
+
+    // month-to-date posted invoices per salesperson — the monthly twin of
+    // the invoiced-today table (same basis: posted INV/ documents,
+    // amount_residual = still unpaid as of the last sync)
+    function renderInvMonthReps() {
+      const box = document.getElementById("invMonthRepBox");
+      if (!invMonth) { box.innerHTML = `<div class="empty">${D.t("loading")}</div>`; return; }
+      const rows = repTableRows(invMonth.by_rep);
+      if (!rows) { box.innerHTML = `<div class="empty">${D.t("no_data")}</div>`; return; }
+      box.innerHTML = `
+        <table class="dt">
+          ${repTableHead()}
+          <tbody>${rows}</tbody>
+        </table>
+        <div class="muted" style="padding:9px 14px;font-size:12px">
+          ${invMonth.month} · ${D.fmtNum(invMonth.count)} ${D.t("invoices_w")} ·
+          <span class="ok">${D.fmtMoney(num(invMonth.collected))}</span> ${D.t("collected_so_far")}
+        </div>`;
     }
 
     // cash physically in transit, grouped by the courier journal that holds it
