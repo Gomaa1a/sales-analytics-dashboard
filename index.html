@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Sales Command Center</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=39" />
+  <link rel="stylesheet" href="assets/css/style.css?v=40" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -91,9 +91,9 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=39"></script>
-  <script src="assets/js/auth.js?v=39"></script>
-  <script src="assets/js/common.js?v=39"></script>
+  <script src="assets/js/config.js?v=40"></script>
+  <script src="assets/js/auth.js?v=40"></script>
+  <script src="assets/js/common.js?v=40"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -183,6 +183,12 @@
       try { collSnap = await D.api("collections"); } catch (e) { collSnap = null; }
       try { invToday = await D.api("invoices_today"); } catch (e) { invToday = null; }
       try { invMonth = await D.api("invoices_month"); } catch (e) { invMonth = null; }
+      // rep dropdown: order reps + today's invoice reps (they can spell
+      // differently, and orders may not be loaded yet after a data reset)
+      fb.setReps([
+        ...allRows.map(o => o.salesperson),
+        ...(((invToday && invToday.by_rep) || []).map(r => r.salesperson))
+      ]);
     }
 
     const kpi = (cls, label, n, sub) =>
@@ -447,13 +453,23 @@
         <td class="amt">${b.residual > 0 ? `<span class="danger">${D.fmtMoney(b.residual)}</span>` : `<span class="muted">0</span>`}</td>
       </tr>`;
       const gap = Math.max(0, num(orderedToday) - num(t.posted.value));
-      // per-salesperson slice of today's POSTED book (names come from the
-      // customer master — DB strings, so they go through D.esc)
-      const repRows = (t.by_rep || []).map(r => `<tr>
+      // per-salesperson slice of today's POSTED book. Honors the page's rep
+      // filter: match by user_id (resolved from the loaded orders, since the
+      // dropdown holds ORDER rep spellings), falling back to name equality.
+      const v = fb.values();
+      let byRep = t.by_rep || [];
+      if (v.rep) {
+        const o = allRows.find(r => r.salesperson === v.rep && r.user_id != null);
+        const uid = o ? o.user_id : null;
+        byRep = byRep.filter(r => (uid != null && r.user_id === uid) || r.salesperson === v.rep);
+      }
+      // names are DB strings, so they go through D.esc
+      const repRows = byRep.map(r => `<tr>
         <td class="strong">${D.esc(r.salesperson)}</td>
         <td class="amt">${D.fmtNum(r.n)}</td>
         <td class="amt">${D.fmtMoney(r.value)}</td>
         <td class="amt">${r.residual > 0 ? `<span class="danger">${D.fmtMoney(r.residual)}</span>` : `<span class="muted">0</span>`}</td>
+        <td class="amt"><span class="ok">${D.fmtMoney(r.value - r.residual)}</span></td>
       </tr>`).join("");
       box.innerHTML = `
         <table class="dt">
@@ -473,7 +489,7 @@
         ${repRows ? `
         <div class="panel-head" style="border-top:1px solid var(--bdr)"><h2>${D.t("inv_by_rep")}</h2></div>
         <table class="dt">
-          <thead><tr><th>${D.t("col_rep")}</th><th>${D.t("col_count")}</th><th>${D.t("col_amount")}</th><th>${D.t("col_still_unpaid")}</th></tr></thead>
+          <thead><tr><th>${D.t("col_rep")}</th><th>${D.t("col_count")}</th><th>${D.t("col_amount")}</th><th>${D.t("col_still_unpaid")}</th><th>${D.t("col_collected")}</th></tr></thead>
           <tbody>${repRows}</tbody>
         </table>` : ""}`;
     }
