@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-07-16 — Shorter Overview: paired cards, capped heights (v48)
+
+- The Overview was too long. The today invoice/payment cards now sit
+  **side by side** (grid-2), same for the month pair; all four bodies get
+  the `cap` scroll (max 60vh, sticky headers) so long rep lists scroll
+  inside the card instead of stretching the page.
+- The **month pair starts collapsed** on first visit (click to open;
+  choice still persists per panel).
+- n8n: "Dabboos Orders BACKFILL 2026 (run once)" standalone workflow —
+  sale.order rows created 2026-01-01+, risk-scored against a fresh
+  customer master fetched in the same run; chunked upserts on order_id.
+- Cache-bust v=48.
+
 ## 2026-07-15 — Collapsible cards + full rep list + customer filter on invoice tables (v47)
 
 - The four invoice/payment cards (today by status+rep, month by rep) are

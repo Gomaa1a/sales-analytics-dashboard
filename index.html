@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Sales Command Center</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=47" />
+  <link rel="stylesheet" href="assets/css/style.css?v=48" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -25,13 +25,15 @@
     <!-- Row 1 — TODAY: how is the day going? (always anchored to today) -->
     <h2 class="sect-h" id="secToday"></h2>
     <div id="todayKpis" class="kpi-grid"></div>
-    <div class="panel" style="margin-bottom:16px" data-src="dashboard_invoices">
-      <div class="panel-head"><h2 id="invTodayTitle"></h2></div>
-      <div class="panel-body" style="padding:0"><div id="invTodayBox"></div></div>
-    </div>
-    <div class="panel" style="margin-bottom:16px" data-src="dashboard_payments">
-      <div class="panel-head"><h2 id="payTodayTitle"></h2></div>
-      <div class="panel-body" style="padding:0"><div id="payTodayBox"></div></div>
+    <div class="grid-2" style="margin-bottom:16px">
+      <div class="panel" data-src="dashboard_invoices">
+        <div class="panel-head"><h2 id="invTodayTitle"></h2></div>
+        <div class="panel-body cap" style="padding:0"><div id="invTodayBox"></div></div>
+      </div>
+      <div class="panel" data-src="dashboard_payments">
+        <div class="panel-head"><h2 id="payTodayTitle"></h2></div>
+        <div class="panel-body cap" style="padding:0"><div id="payTodayBox"></div></div>
+      </div>
     </div>
 
     <!-- Row 2 — THE MONTH: invoiced vs target · cash collected -->
@@ -40,13 +42,15 @@
       <div class="exec-heads" id="execHeads"></div>
       <div class="exec-mini" id="execMini"></div>
     </section>
-    <div class="panel" style="margin-bottom:16px" data-src="dashboard_invoices">
-      <div class="panel-head"><h2 id="invMonthRepTitle"></h2></div>
-      <div class="panel-body" style="padding:0"><div id="invMonthRepBox"></div></div>
-    </div>
-    <div class="panel" style="margin-bottom:16px" data-src="dashboard_payments">
-      <div class="panel-head"><h2 id="payMonthRepTitle"></h2></div>
-      <div class="panel-body" style="padding:0"><div id="payMonthRepBox"></div></div>
+    <div class="grid-2" style="margin-bottom:16px">
+      <div class="panel" data-src="dashboard_invoices">
+        <div class="panel-head"><h2 id="invMonthRepTitle"></h2></div>
+        <div class="panel-body cap" style="padding:0"><div id="invMonthRepBox"></div></div>
+      </div>
+      <div class="panel" data-src="dashboard_payments">
+        <div class="panel-head"><h2 id="payMonthRepTitle"></h2></div>
+        <div class="panel-body cap" style="padding:0"><div id="payMonthRepBox"></div></div>
+      </div>
     </div>
 
     <!-- Row 3 — NAMES: who to call, who is performing -->
@@ -80,9 +84,9 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=47"></script>
-  <script src="assets/js/auth.js?v=47"></script>
-  <script src="assets/js/common.js?v=47"></script>
+  <script src="assets/js/config.js?v=48"></script>
+  <script src="assets/js/auth.js?v=48"></script>
+  <script src="assets/js/common.js?v=48"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -105,7 +109,8 @@
 
     // the invoice/payment cards are tall — let the user collapse them.
     // Click the panel head to toggle; the choice persists per panel.
-    function collapsible(titleId) {
+    // The month pair starts collapsed on first visit (page length).
+    function collapsible(titleId, defaultCollapsed) {
       const h2 = document.getElementById(titleId); if (!h2) return;
       const head = h2.closest(".panel-head");
       const body = head.parentElement.querySelector(".panel-body");
@@ -116,10 +121,12 @@
       head.style.cursor = "pointer";
       const KEY = "clps_" + titleId;
       const set = c => { body.style.display = c ? "none" : ""; arrow.textContent = c ? "▸" : "▾"; localStorage.setItem(KEY, c ? "1" : "0"); };
-      set(localStorage.getItem(KEY) === "1");
+      const stored = localStorage.getItem(KEY);
+      set(stored == null ? !!defaultCollapsed : stored === "1");
       head.addEventListener("click", () => set(body.style.display !== "none"));
     }
-    ["invTodayTitle", "payTodayTitle", "invMonthRepTitle", "payMonthRepTitle"].forEach(collapsible);
+    ["invTodayTitle", "payTodayTitle"].forEach(id => collapsible(id, false));
+    ["invMonthRepTitle", "payMonthRepTitle"].forEach(id => collapsible(id, true));
 
     const isConf = o => o.state === "sale" || o.state === "done";
     const val = o => Number(o.amount_total) || 0;
