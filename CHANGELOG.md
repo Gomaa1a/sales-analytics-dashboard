@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-07-15 — n8n payments fix: refunds counted (no asset changes)
+
+- Found by the owner comparing Odoo's Customer Payments day totals:
+  the sync filtered `payment_type = inbound`, so **customer refunds
+  (outbound) were never fetched** — the dashboard showed MORE cash than
+  Odoo (2026-07-01: 33,675,250 vs 33,618,250 = one 57,000 refund).
+- Both payment workflows now fetch both directions for customers and
+  store refunds with **negative amounts**; every sum (day, rep, month)
+  nets exactly like Odoo's signed Amount column. Verified with a fixture
+  reproducing the owner's July-1 case (557,500 − 57,000 = 500,500).
+- Re-import both payment workflow JSONs and run the BACKFILL once to pull
+  historical refunds in (upserts — no duplicates, no truncate needed).
+
 ## 2026-07-15 — Payments cards mirror the invoice cards (v46)
 
 - Removed by owner request: **"Cash in transit — who holds it now?"** and
