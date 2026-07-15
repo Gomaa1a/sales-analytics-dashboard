@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Sales Command Center</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=43" />
+  <link rel="stylesheet" href="assets/css/style.css?v=44" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -25,7 +25,7 @@
     <!-- Row 1 — TODAY: how is the day going? (always anchored to today) -->
     <h2 class="sect-h" id="secToday"></h2>
     <div id="todayKpis" class="kpi-grid"></div>
-    <div class="panel" style="margin-bottom:16px">
+    <div class="panel" style="margin-bottom:16px" data-src="dashboard_invoices">
       <div class="panel-head"><h2 id="invTodayTitle"></h2></div>
       <div class="panel-body" style="padding:0"><div id="invTodayBox"></div></div>
     </div>
@@ -36,7 +36,7 @@
       <div class="exec-heads" id="execHeads"></div>
       <div class="exec-mini" id="execMini"></div>
     </section>
-    <div class="panel" style="margin-bottom:16px">
+    <div class="panel" style="margin-bottom:16px" data-src="dashboard_invoices">
       <div class="panel-head"><h2 id="invMonthRepTitle"></h2></div>
       <div class="panel-body" style="padding:0"><div id="invMonthRepBox"></div></div>
     </div>
@@ -44,11 +44,11 @@
     <!-- Row 3 — NAMES: who to call, who is performing -->
     <h2 class="sect-h" id="secNames"></h2>
     <div class="grid-2">
-      <div class="panel">
+      <div class="panel" data-src="dashboard_invoices">
         <div class="panel-head"><h2 id="debtorsTitle"></h2></div>
         <div class="panel-body" style="padding:0"><div id="debtorsBox"></div></div>
       </div>
-      <div class="panel">
+      <div class="panel" data-src="dashboard_orders">
         <div class="panel-head"><h2 id="leaderTitle"></h2></div>
         <div class="panel-body" style="padding:0"><div id="leaderBox"></div></div>
       </div>
@@ -57,11 +57,11 @@
     <!-- Row 4 — RHYTHM: daily pulse + weekly trajectory -->
     <h2 class="sect-h" id="secRhythm"></h2>
     <div class="grid-2">
-      <div class="panel">
+      <div class="panel" data-src="dashboard_orders">
         <div class="panel-head"><h2 id="dayTitle"></h2></div>
         <div class="panel-body"><div class="chart-box"><canvas id="dayChart"></canvas></div></div>
       </div>
-      <div class="panel">
+      <div class="panel" data-src="dashboard_orders">
         <div class="panel-head"><h2 id="weekTitle"></h2></div>
         <div class="panel-body"><div class="chart-box"><canvas id="weekChart"></canvas></div></div>
       </div>
@@ -70,11 +70,11 @@
     <!-- Row 5 — WHO: customer dependency + cash physically in transit -->
     <h2 class="sect-h" id="secWho"></h2>
     <div class="grid-2">
-      <div class="panel">
+      <div class="panel" data-src="dashboard_orders">
         <div class="panel-head"><h2 id="custTitle"></h2></div>
         <div class="panel-body"><div class="chart-box"><canvas id="custChart"></canvas></div></div>
       </div>
-      <div class="panel">
+      <div class="panel" data-src="dashboard_payments">
         <div class="panel-head"><h2 id="transitTitle"></h2></div>
         <div class="panel-body" style="padding:0"><div id="transitBox"></div></div>
       </div>
@@ -84,9 +84,9 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=43"></script>
-  <script src="assets/js/auth.js?v=43"></script>
-  <script src="assets/js/common.js?v=43"></script>
+  <script src="assets/js/config.js?v=44"></script>
+  <script src="assets/js/auth.js?v=44"></script>
+  <script src="assets/js/common.js?v=44"></script>
   <script>
   (function () {
     const D = window.DASH;

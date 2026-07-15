@@ -272,6 +272,29 @@
       admin_user_exists: "اسم المستخدم مستخدم مسبقاً",
       admin_you: "هذا حسابك",
       admin_pw_note: "لإعادة تعيين كلمة مرور مستخدم: من لوحة Supabase → Authentication → Users، أو أوقف الحساب وأنشئ حساباً جديداً.",
+      admin_sources: "مصادر البيانات (إظهار / إخفاء)",
+      admin_sources_sub: "أخفِ اللوحات والرسوم التي تعتمد على جدول معيّن من Supabase — يُطبَّق على جميع المستخدمين.",
+      src_col_table: "الجدول",
+      src_col_feeds: "يظهر في لوحة القيادة",
+      src_col_visible: "ظاهر",
+      src_hidden_note: "عند الإخفاء تختفي كل اللوحات المرتبطة بهذا الجدول من كل الصفحات.",
+      src_invoices: "الفواتير",
+      src_payments: "المدفوعات",
+      src_orders: "الطلبات",
+      src_customers: "العملاء",
+      src_f_inv_today: "المفوتر اليوم + فواتير اليوم حسب الحالة/المندوب",
+      src_f_inv_month: "فواتير الشهر حسب المندوب",
+      src_f_debt: "صفحة الديون + أقدم المدينين + أعمار الذمم",
+      src_f_cash: "التحصيل اليوم/الشهر",
+      src_f_collections: "صفحة التحصيلات",
+      src_f_transit: "النقد قيد التحويل",
+      src_f_orders_today: "طلبات اليوم",
+      src_f_charts: "رسوم الطلبات اليومية/الأسبوعية + أفضل العملاء",
+      src_f_leader: "لوحة أداء المندوبين",
+      src_f_regions: "صفحة المناطق",
+      src_f_sales: "صفحة المندوبين",
+      src_f_names: "أسماء العملاء والمندوبين",
+      src_f_geo: "المحافظة/المدينة على الخرائط والجداول",
       tr_views_today: "زيارات اليوم",
       tr_views_7: "زيارات آخر ٧ أيام",
       tr_users_7: "مستخدمون نشطون (٧ أيام)",
@@ -536,6 +559,29 @@
       admin_user_exists: "Username already taken",
       admin_you: "This is your account",
       admin_pw_note: "To reset a user's password: Supabase dashboard → Authentication → Users, or suspend the account and create a new one.",
+      admin_sources: "Data sources (show / hide)",
+      admin_sources_sub: "Hide the panels and charts fed by a specific Supabase table — applies to every user.",
+      src_col_table: "Table",
+      src_col_feeds: "Shows up on the dashboard as",
+      src_col_visible: "Visible",
+      src_hidden_note: "Hiding a table removes every panel tied to it, on all pages.",
+      src_invoices: "Invoices",
+      src_payments: "Payments",
+      src_orders: "Orders",
+      src_customers: "Customers",
+      src_f_inv_today: "Invoiced-today KPI + today's invoices by status / salesperson",
+      src_f_inv_month: "This month's invoices by salesperson",
+      src_f_debt: "Debt page + top debtors + receivables aging",
+      src_f_cash: "Cash collected today / this month",
+      src_f_collections: "Collections page",
+      src_f_transit: "Cash in transit",
+      src_f_orders_today: "Today's orders count",
+      src_f_charts: "Daily / weekly order charts + top customers",
+      src_f_leader: "Salesperson leaderboard",
+      src_f_regions: "Regions page",
+      src_f_sales: "Salespeople page",
+      src_f_names: "Customer & rep names",
+      src_f_geo: "Governorate / city on maps & tables",
       tr_views_today: "Views today",
       tr_views_7: "Views last 7 days",
       tr_users_7: "Active users (7 days)",
@@ -655,6 +701,63 @@
     });
     if (!res.ok) { authFail(res); throw new Error("Supabase HTTP " + res.status); }
     return res.status === 204 ? null : res.json();
+  }
+
+  /* ---------------- data-source visibility (admin-controlled, GLOBAL) ----------------
+     An admin can hide whole panels that are fed by a specific raw table.
+     The setting lives in dash_settings.hidden_sources (Supabase, RLS: admins
+     write / everyone reads — see supabase/data-source-visibility.sql). Any
+     element tagged data-src="dashboard_invoices" (space-separate for several)
+     is hidden when its source is in the hidden set. Panels are static wrappers
+     in each page's HTML, so one pass hides them regardless of inner re-renders.
+
+     DATA_SOURCES also documents WHAT each table feeds — used by the admin
+     reference view AND as the toggle labels. `feeds` are i18n keys. */
+  const DATA_SOURCES = [
+    { table: "dashboard_invoices",  key: "src_invoices",  feeds: ["src_f_inv_today", "src_f_inv_month", "src_f_debt"] },
+    { table: "dashboard_payments",  key: "src_payments",  feeds: ["src_f_cash", "src_f_collections", "src_f_transit"] },
+    { table: "dashboard_orders",    key: "src_orders",    feeds: ["src_f_orders_today", "src_f_charts", "src_f_leader", "src_f_regions", "src_f_sales"] },
+    { table: "dashboard_customers", key: "src_customers", feeds: ["src_f_names", "src_f_geo"] }
+  ];
+  const HIDDEN_SRC_LKEY = "dash_hidden_src";
+  let _hiddenSrc = null; // cached Set of hidden table names
+
+  function hiddenSrcLocal() {
+    try { return new Set(JSON.parse(localStorage.getItem(HIDDEN_SRC_LKEY) || "[]")); }
+    catch (e) { return new Set(); }
+  }
+  // Read the global setting. Falls back to the last-known local copy (then
+  // empty) if the table is missing or the network fails — so a not-yet-run
+  // migration or an offline poll never blanks the whole dashboard.
+  async function loadHiddenSources(force) {
+    if (_hiddenSrc && !force) return _hiddenSrc;
+    try {
+      const rows = await sbGet("dash_settings?select=value&key=eq.hidden_sources");
+      const arr = (rows && rows[0] && rows[0].value && rows[0].value.tables) || [];
+      _hiddenSrc = new Set(arr);
+      localStorage.setItem(HIDDEN_SRC_LKEY, JSON.stringify(arr));
+    } catch (e) { _hiddenSrc = hiddenSrcLocal(); }
+    return _hiddenSrc;
+  }
+  // Admin only (RLS enforces it). The 'hidden_sources' row is seeded by the
+  // SQL, so a PATCH always hits an existing row — no upsert needed.
+  async function setHiddenSources(arr) {
+    await sbWrite("PATCH", "dash_settings?key=eq.hidden_sources",
+      { value: { tables: arr }, updated_at: new Date().toISOString() });
+    _hiddenSrc = new Set(arr);
+    localStorage.setItem(HIDDEN_SRC_LKEY, JSON.stringify(arr));
+  }
+  function applyHiddenTo(root, hiddenSet) {
+    (root || document).querySelectorAll("[data-src]").forEach(el => {
+      const hide = el.getAttribute("data-src").split(/\s+/).filter(Boolean).some(s => hiddenSet.has(s));
+      el.style.display = hide ? "none" : "";
+    });
+  }
+  // Paint instantly from the last-known local copy (no flash on repeat loads),
+  // then reconcile with the server copy.
+  function applyDataSourceVisibility() {
+    applyHiddenTo(document, hiddenSrcLocal());
+    loadHiddenSources(true).then(set => applyHiddenTo(document, set)).catch(() => {});
   }
 
   /* ---------------- raw-table adapters ----------------
@@ -1144,6 +1247,8 @@
       if (lo) lo.addEventListener("click", () => window.DASH_AUTH.signOut());
       renderSoundBtn();
     }
+    // hide any panels whose source table an admin has switched off (global)
+    applyDataSourceVisibility();
   }
 
   function setUpdated(ts) {
@@ -1483,7 +1588,8 @@
     fmtNum, fmtMoney, fmtMoneyFull, fmtDate, fmtTime,
     api, ackAlert, beep, toast, notify, buildChrome, setUpdated, renderSoundBtn,
     stateLabel, trustLabel, filterBar,
-    govOf, govLabel, GOV, loadOrders, loadPayments, sbGetAll, sbWrite, nextDay, bagDay, addDays, weekStartSat,
+    govOf, govLabel, GOV, loadOrders, loadPayments, sbGetAll, sbGet, sbWrite, nextDay, bagDay, addDays, weekStartSat,
+    DATA_SOURCES, loadHiddenSources, setHiddenSources, applyDataSourceVisibility,
     cfg: CFG
   };
 })();

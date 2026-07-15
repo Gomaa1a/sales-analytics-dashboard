@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-07-15 — Admin: show/hide data sources + what-each-feeds (v44)
+
+- **Admin → Data sources** panel: one toggle per raw table
+  (invoices / payments / orders / customers). Turning a table off hides
+  every panel and chart fed by it, **for all users** — the setting is
+  global (Supabase `dash_settings.hidden_sources`, RLS: admins write /
+  everyone reads). Each row also documents what that table feeds on the
+  dashboard, so the impact is visible before flipping it.
+- Mechanism: panels carry a declarative `data-src="dashboard_…"` tag;
+  `applyDataSourceVisibility()` (run from `buildChrome` on every page)
+  hides tagged panels whose source is off. Paints instantly from a
+  localStorage copy (no flash), then reconciles with the server.
+- Degrades safely: if `data-source-visibility.sql` hasn't been run, or the
+  fetch fails, everything stays visible. Deploy order is not constrained.
+- New file `supabase/data-source-visibility.sql` (run once). Mixed-source
+  KPI strips and the month exec band are intentionally not hideable (they
+  combine tables); only clearly single-source panels are tagged.
+- Cache-bust v=44.
+
 ## 2026-07-15 — Trim the Overview month band (v43)
 
 - Removed by owner request: the **Outstanding overdue** exec card (with its
