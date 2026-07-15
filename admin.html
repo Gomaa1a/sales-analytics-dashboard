@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Admin Panel</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=43" />
+  <link rel="stylesheet" href="assets/css/style.css?v=44" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -57,6 +57,15 @@
       <div class="panel-body" style="padding:0;overflow-x:auto"><div id="usersBox" class="u-table"></div></div>
     </div>
 
+    <!-- data sources: show / hide + what each feeds -->
+    <div class="panel" style="margin-bottom:18px">
+      <div class="panel-head"><h2 id="srcTitle"></h2></div>
+      <div class="panel-body">
+        <p class="pw-note" id="srcSub" style="margin:0 0 12px"></p>
+        <div style="overflow-x:auto"><div id="srcBox" class="u-table"></div></div>
+      </div>
+    </div>
+
     <!-- traffic -->
     <div class="page-head" style="margin-top:26px"><h1 id="trTitle"></h1></div>
     <div id="trKpis" class="kpi-grid"></div>
@@ -83,9 +92,9 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=43"></script>
-  <script src="assets/js/auth.js?v=43"></script>
-  <script src="assets/js/common.js?v=43"></script>
+  <script src="assets/js/config.js?v=44"></script>
+  <script src="assets/js/auth.js?v=44"></script>
+  <script src="assets/js/common.js?v=44"></script>
   <script>
   (function () {
     const D = window.DASH, A = window.DASH_AUTH;
@@ -95,6 +104,8 @@
     $("pgSub").textContent = D.t("admin_sub");
     $("createTitle").textContent = D.t("admin_create");
     $("usersTitle").textContent = D.t("admin_users");
+    $("srcTitle").textContent = D.t("admin_sources");
+    $("srcSub").textContent = D.t("admin_sources_sub");
     $("trTitle").textContent = D.t("admin_traffic");
     $("trDayTitle").textContent = D.t("tr_per_day");
     $("trPageTitle").textContent = D.t("tr_by_page");
@@ -216,6 +227,49 @@
       btn.disabled = false;
     });
 
+    /* ---------------- data sources: show / hide ----------------
+       One toggle per raw table. Hidden set is GLOBAL (dash_settings,
+       admins write / everyone reads). Each row also documents what the
+       table feeds on the dashboard, so admins see the impact before
+       flipping it. Saving re-applies visibility to this page too. */
+    async function renderSources() {
+      const hidden = await D.loadHiddenSources(true);
+      $("srcBox").innerHTML = `
+        <table class="dt">
+          <thead><tr>
+            <th>${D.t("src_col_table")}</th>
+            <th>${D.t("src_col_feeds")}</th>
+            <th style="text-align:center">${D.t("src_col_visible")}</th>
+          </tr></thead>
+          <tbody>
+          ${D.DATA_SOURCES.map(s => `<tr data-table="${s.table}">
+            <td><b>${D.t(s.key)}</b><div class="muted" style="font-size:11px">${s.table}</div></td>
+            <td class="muted" style="font-size:12px">${s.feeds.map(f => D.esc(D.t(f))).join(" · ")}</td>
+            <td style="text-align:center"><input type="checkbox" class="src-vis"${hidden.has(s.table) ? "" : " checked"}></td>
+          </tr>`).join("")}
+          </tbody>
+        </table>
+        <div style="padding:12px 2px 2px;display:flex;gap:12px;align-items:center">
+          <button class="save-btn" id="srcSave" type="button">${D.t("admin_save")}</button>
+          <span class="pw-note" style="margin:0">${D.t("src_hidden_note")}</span>
+        </div>`;
+      $("srcSave").addEventListener("click", async () => {
+        const btn = $("srcSave");
+        btn.disabled = true;
+        try {
+          const off = [...document.querySelectorAll("#srcBox tr[data-table]")]
+            .filter(tr => !tr.querySelector(".src-vis").checked)
+            .map(tr => tr.getAttribute("data-table"));
+          await D.setHiddenSources(off);
+          D.applyDataSourceVisibility();
+          D.toast("<b>" + D.t("admin_saved") + "</b>");
+        } catch (e) {
+          D.toast("<b>" + D.t("admin_err") + "</b>", "critical");
+        }
+        btn.disabled = false;
+      });
+    }
+
     /* ---------------- traffic ---------------- */
     const BAGHDAD = { timeZone: "Asia/Baghdad" };
     const dayKey = ts => new Date(ts).toLocaleDateString("en-CA", BAGHDAD); // YYYY-MM-DD
@@ -280,7 +334,7 @@
     }
 
     async function tick() {
-      try { await Promise.all([loadUsers(), loadTraffic()]); }
+      try { await Promise.all([loadUsers(), renderSources(), loadTraffic()]); }
       catch (e) { $("usersBox").innerHTML = `<div class="err">${D.t("error_load")}</div>`; }
     }
     tick();
