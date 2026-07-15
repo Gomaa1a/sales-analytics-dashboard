@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Sales Command Center</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=46" />
+  <link rel="stylesheet" href="assets/css/style.css?v=47" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -80,9 +80,9 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=46"></script>
-  <script src="assets/js/auth.js?v=46"></script>
-  <script src="assets/js/common.js?v=46"></script>
+  <script src="assets/js/config.js?v=47"></script>
+  <script src="assets/js/auth.js?v=47"></script>
+  <script src="assets/js/common.js?v=47"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -103,6 +103,24 @@
     document.getElementById("invTodayTitle").textContent = D.t("inv_today_tbl");
     document.getElementById("invMonthRepTitle").textContent = D.t("inv_by_rep_month");
 
+    // the invoice/payment cards are tall — let the user collapse them.
+    // Click the panel head to toggle; the choice persists per panel.
+    function collapsible(titleId) {
+      const h2 = document.getElementById(titleId); if (!h2) return;
+      const head = h2.closest(".panel-head");
+      const body = head.parentElement.querySelector(".panel-body");
+      if (!head || !body) return;
+      const arrow = document.createElement("span");
+      arrow.style.cssText = "margin-inline-start:8px;font-size:11px;opacity:.55";
+      head.appendChild(arrow);
+      head.style.cursor = "pointer";
+      const KEY = "clps_" + titleId;
+      const set = c => { body.style.display = c ? "none" : ""; arrow.textContent = c ? "▸" : "▾"; localStorage.setItem(KEY, c ? "1" : "0"); };
+      set(localStorage.getItem(KEY) === "1");
+      head.addEventListener("click", () => set(body.style.display !== "none"));
+    }
+    ["invTodayTitle", "payTodayTitle", "invMonthRepTitle", "payMonthRepTitle"].forEach(collapsible);
+
     const isConf = o => o.state === "sale" || o.state === "done";
     const val = o => Number(o.amount_total) || 0;
     const num = n => Number(n) || 0;
@@ -115,7 +133,18 @@
 
     let dayChart = null, custChart = null, weekChart = null;
     let allRows = [], payments = [], debtRows = [], alerts = [], collSnap = null, invToday = null, invMonth = null;
+    let masterReps = [];
     let loadedFrom = null, loadedTo = null;
+
+    // resolve a rep name (any spelling source) to their Odoo user id, so
+    // filtering matches across orders/invoices/payments even when the same
+    // rep is spelled differently in each table
+    function repUid(name) {
+      const hit = masterReps.find(r => r.name === name) ||
+        allRows.find(o => o.salesperson === name && o.user_id != null) ||
+        payments.find(p => p.salesperson === name && p.user_id != null);
+      return hit ? (hit.user_id != null ? hit.user_id : null) : null;
+    }
 
     // Baghdad calendar anchors
     const bag = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Baghdad" }));
@@ -171,10 +200,15 @@
       try { collSnap = await D.api("collections"); } catch (e) { collSnap = null; }
       try { invToday = await D.api("invoices_today"); } catch (e) { invToday = null; }
       try { invMonth = await D.api("invoices_month"); } catch (e) { invMonth = null; }
-      // rep dropdown: order reps + today's invoice reps (they can spell
-      // differently, and orders may not be loaded yet after a data reset)
+      // the salespeople MASTER (synced from Odoo) — so the dropdown holds
+      // ALL reps, not only the ones with activity in the loaded window
+      try { masterReps = await D.sbGet("salespeople?select=user_id,name&order=name"); }
+      catch (e) { masterReps = masterReps || []; }
+      // rep dropdown: master + every spelling seen in orders/invoices/payments
       fb.setReps([
+        ...masterReps.map(r => r.name),
         ...allRows.map(o => o.salesperson),
+        ...payments.map(p => p.salesperson),
         ...(((invToday && invToday.by_rep) || []).map(r => r.salesperson))
       ]);
     }
@@ -219,7 +253,12 @@
       const pace = (revMonth != null && dayOfMonth > 0) ? Math.round(revMonth / dayOfMonth * daysInMonth) : revMonth;
       const paceVs = (TARGET > 0 && pace != null) ? Math.round(pace / TARGET * 100) : null;
 
-      const paysRC = payments.filter(p => fb.match(p, { rep: "salesperson", cust: "partner_name" }));
+      // uid-aware rep matching: the dropdown may hold a different spelling
+      // of the same rep than the payments rows carry
+      const vRepUid = v.rep ? repUid(v.rep) : null;
+      const paysRC = payments.filter(p =>
+        (!v.rep || p.salesperson === v.rep || (vRepUid != null && p.user_id === vRepUid)) &&
+        (!v.cust || String(p.partner_name || "").toLowerCase().includes(v.cust)));
       // cash card: straight sum of dashboard_payments (excl. cancelled) —
       // the same basis as the today's-cash KPI
       const cashMonth = paysRC.filter(p => String(p.date).slice(0, 7) === thisMonth).reduce((s, p) => s + num(p.amount), 0);
@@ -451,7 +490,7 @@
         <td class="amt">${b.residual > 0 ? `<span class="danger">${D.fmtMoney(b.residual)}</span>` : `<span class="muted">0</span>`}</td>
       </tr>`;
       const gap = Math.max(0, num(orderedToday) - num(t.posted.value));
-      const repRows = repTableRows(t.by_rep);
+      const repRows = repTableRows(t.posted_rows || []);
       box.innerHTML = `
         <table class="dt">
           <thead><tr><th>${D.t("ack_status")}</th><th>${D.t("col_count")}</th><th>${D.t("col_amount")}</th><th>${D.t("col_still_unpaid")}</th></tr></thead>
@@ -475,19 +514,26 @@
         </table>` : ""}`;
     }
 
-    // Shared by the today/month per-rep invoice tables.
-    // Honors the page's rep filter: the dropdown holds ORDER rep spellings,
-    // so match by user_id resolved from the loaded orders, falling back to
-    // name equality. Names are DB strings — they go through D.esc.
-    function repTableRows(byRep) {
+    // Shared by the today/month per-rep invoice tables. Aggregates the
+    // INVOICE-LEVEL rows client-side so BOTH filters apply: salesperson
+    // (uid-aware — spellings differ between tables) and customer name.
+    // Names are DB strings — they go through D.esc.
+    function invRepAgg(rows) {
       const v = fb.values();
-      let list = byRep || [];
-      if (v.rep) {
-        const o = allRows.find(r => r.salesperson === v.rep && r.user_id != null);
-        const uid = o ? o.user_id : null;
-        list = list.filter(r => (uid != null && r.user_id === uid) || r.salesperson === v.rep);
-      }
-      return list.map(r => `<tr>
+      const uid = v.rep ? repUid(v.rep) : null;
+      let list = rows || [];
+      if (v.rep) list = list.filter(r => (uid != null && r.user_id === uid) || r.salesperson === v.rep);
+      if (v.cust) list = list.filter(r => String(r.partner_name || "").toLowerCase().includes(v.cust));
+      const m = new Map();
+      list.forEach(r => {
+        const k = r.user_id != null ? r.user_id : (r.salesperson || "—");
+        if (!m.has(k)) m.set(k, { user_id: r.user_id, salesperson: r.salesperson, n: 0, value: 0, residual: 0 });
+        const e = m.get(k); e.n++; e.value += r.value; e.residual += r.residual;
+      });
+      return [...m.values()].sort((a, b) => b.value - a.value);
+    }
+    function repTableRows(rows) {
+      return invRepAgg(rows).map(r => `<tr>
         <td class="strong">${D.esc(r.salesperson)}</td>
         <td class="amt">${D.fmtNum(r.n)}</td>
         <td class="amt">${D.fmtMoney(r.value)}</td>
@@ -504,7 +550,7 @@
     function renderInvMonthReps() {
       const box = document.getElementById("invMonthRepBox");
       if (!invMonth) { box.innerHTML = `<div class="empty">${D.t("loading")}</div>`; return; }
-      const rows = repTableRows(invMonth.by_rep);
+      const rows = repTableRows(invMonth.posted_rows || []);
       if (!rows) { box.innerHTML = `<div class="empty">${D.t("no_data")}</div>`; return; }
       box.innerHTML = `
         <table class="dt">

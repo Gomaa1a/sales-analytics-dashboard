@@ -1,5 +1,34 @@
 # Changelog
 
+## 2026-07-15 — Collapsible cards + full rep list + customer filter on invoice tables (v47)
+
+- The four invoice/payment cards (today by status+rep, month by rep) are
+  now **collapsible** — click the panel head to fold/unfold; the choice
+  persists per panel (localStorage).
+- The salesperson dropdown now includes **every rep from the `salespeople`
+  master** (plus every spelling seen in orders/invoices/payments), not
+  only reps with activity in the loaded window.
+- **Customer search now narrows the invoice by-salesperson tables** too:
+  the builders return invoice-level rows (`posted_rows` with
+  partner_name), and the page aggregates client-side after applying both
+  filters. Rep matching is uid-aware everywhere (the same rep can be
+  spelled differently in orders vs invoices vs payments) — payments
+  filtering upgraded to uid-aware as well.
+- Cache-bust v=47.
+
+## 2026-07-15 — n8n payments fix: refunds counted (no asset changes)
+
+- Found by the owner comparing Odoo's Customer Payments day totals:
+  the sync filtered `payment_type = inbound`, so **customer refunds
+  (outbound) were never fetched** — the dashboard showed MORE cash than
+  Odoo (2026-07-01: 33,675,250 vs 33,618,250 = one 57,000 refund).
+- Both payment workflows now fetch both directions for customers and
+  store refunds with **negative amounts**; every sum (day, rep, month)
+  nets exactly like Odoo's signed Amount column. Verified with a fixture
+  reproducing the owner's July-1 case (557,500 − 57,000 = 500,500).
+- Re-import both payment workflow JSONs and run the BACKFILL once to pull
+  historical refunds in (upserts — no duplicates, no truncate needed).
+
 ## 2026-07-15 — Payments cards mirror the invoice cards (v46)
 
 - Removed by owner request: **"Cash in transit — who holds it now?"** and

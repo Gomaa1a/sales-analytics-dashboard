@@ -123,6 +123,13 @@ governorate (`res.partner.state_id`) → customer master `city`
 → the order's own city snapshot → "no city". No name-guessing.
 
 ## Raw-table adapter bases (2026-07 restructure — snapshots retired)
+- **Payments basis (2026-07-15)**: `dashboard_payments` holds ALL customer
+  payments — inbound receipts positive, **outbound refunds negative**
+  (signed in n8n from `payment_type`), so every sum nets exactly like the
+  signed Amount column on Odoo's Customer Payments screen. Before this,
+  refunds were skipped and the dashboard showed MORE cash than Odoo
+  (2026-07-01: +57,000). Cancelled payments are stored but excluded at
+  load (`loadPayments`).
 - **14-day collections grid** = `dashboard_payments` rows of the last 14
   Baghdad days; paid = state `paid`, pending = state `in_process`.
 - **Receivables age strip** = open-invoice residual AMOUNTS bucketed by
