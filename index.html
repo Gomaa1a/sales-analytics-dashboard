@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Sales Command Center</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=45" />
+  <link rel="stylesheet" href="assets/css/style.css?v=46" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -29,6 +29,10 @@
       <div class="panel-head"><h2 id="invTodayTitle"></h2></div>
       <div class="panel-body" style="padding:0"><div id="invTodayBox"></div></div>
     </div>
+    <div class="panel" style="margin-bottom:16px" data-src="dashboard_payments">
+      <div class="panel-head"><h2 id="payTodayTitle"></h2></div>
+      <div class="panel-body" style="padding:0"><div id="payTodayBox"></div></div>
+    </div>
 
     <!-- Row 2 — THE MONTH: invoiced vs target · cash collected -->
     <h2 class="sect-h" id="secMonth"></h2>
@@ -40,18 +44,16 @@
       <div class="panel-head"><h2 id="invMonthRepTitle"></h2></div>
       <div class="panel-body" style="padding:0"><div id="invMonthRepBox"></div></div>
     </div>
+    <div class="panel" style="margin-bottom:16px" data-src="dashboard_payments">
+      <div class="panel-head"><h2 id="payMonthRepTitle"></h2></div>
+      <div class="panel-body" style="padding:0"><div id="payMonthRepBox"></div></div>
+    </div>
 
     <!-- Row 3 — NAMES: who to call, who is performing -->
     <h2 class="sect-h" id="secNames"></h2>
-    <div class="grid-2">
-      <div class="panel" data-src="dashboard_invoices">
-        <div class="panel-head"><h2 id="debtorsTitle"></h2></div>
-        <div class="panel-body" style="padding:0"><div id="debtorsBox"></div></div>
-      </div>
-      <div class="panel" data-src="dashboard_orders">
-        <div class="panel-head"><h2 id="leaderTitle"></h2></div>
-        <div class="panel-body" style="padding:0"><div id="leaderBox"></div></div>
-      </div>
+    <div class="panel" data-src="dashboard_invoices">
+      <div class="panel-head"><h2 id="debtorsTitle"></h2></div>
+      <div class="panel-body" style="padding:0"><div id="debtorsBox"></div></div>
     </div>
 
     <!-- Row 4 — RHYTHM: daily pulse + weekly trajectory -->
@@ -67,26 +69,20 @@
       </div>
     </div>
 
-    <!-- Row 5 — WHO: customer dependency + cash physically in transit -->
+    <!-- Row 5 — WHO: customer dependency -->
     <h2 class="sect-h" id="secWho"></h2>
-    <div class="grid-2">
-      <div class="panel" data-src="dashboard_orders">
-        <div class="panel-head"><h2 id="custTitle"></h2></div>
-        <div class="panel-body"><div class="chart-box"><canvas id="custChart"></canvas></div></div>
-      </div>
-      <div class="panel" data-src="dashboard_payments">
-        <div class="panel-head"><h2 id="transitTitle"></h2></div>
-        <div class="panel-body" style="padding:0"><div id="transitBox"></div></div>
-      </div>
+    <div class="panel" data-src="dashboard_orders">
+      <div class="panel-head"><h2 id="custTitle"></h2></div>
+      <div class="panel-body"><div class="chart-box"><canvas id="custChart"></canvas></div></div>
     </div>
 
     <div class="foot">Dabboos Sales Command Center · Odoo → n8n → Supabase</div>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=45"></script>
-  <script src="assets/js/auth.js?v=45"></script>
-  <script src="assets/js/common.js?v=45"></script>
+  <script src="assets/js/config.js?v=46"></script>
+  <script src="assets/js/auth.js?v=46"></script>
+  <script src="assets/js/common.js?v=46"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -96,9 +92,9 @@
     document.getElementById("dayTitle").textContent = D.t("ov_orders_day");
     document.getElementById("weekTitle").textContent = D.t("wk_rev_title");
     document.getElementById("custTitle").textContent = D.t("top_customers");
-    document.getElementById("transitTitle").textContent = D.t("transit_title");
     document.getElementById("debtorsTitle").textContent = D.t("ov_top_debtors");
-    document.getElementById("leaderTitle").textContent = D.t("ov_leaderboard");
+    document.getElementById("payTodayTitle").textContent = D.t("pay_today_tbl");
+    document.getElementById("payMonthRepTitle").textContent = D.t("pay_by_rep_month");
     document.getElementById("secToday").textContent = D.t("sec_today");
     document.getElementById("secMonth").textContent = D.t("sec_month");
     document.getElementById("secNames").textContent = D.t("sec_names");
@@ -333,8 +329,8 @@
       // each section individually guarded: one failure logs to the console
       // and leaves only its own panel empty, never a blank page
       sect("debtors", () => renderDebtors(byOver.slice(0, 10)));
-      sect("leaderboard", () => renderLeaderboard(confAll, paysRC));
-      sect("transit", () => renderTransit(paysRC));
+      sect("payments-today", () => renderPayToday(cashTodayRows));
+      sect("payments-month-reps", () => renderPayMonthReps(paysRC));
       sect("chart-days", () => drawByDay(rangeRows));
       sect("chart-weeks", () => drawWeekly(confAll));
       sect("chart-customers", () => drawTopCustomers(rConf));
@@ -371,36 +367,75 @@
         </table>`;
     }
 
-    function renderLeaderboard(confAll, paysRC) {
-      const box = document.getElementById("leaderBox");
-      const m = {};
-      const ensure = n => (m[n] = m[n] || { rep: n, sales: 0, collected: 0, transit: 0, risky: 0 });
-      confAll.forEach(o => { if (inMonth(o, thisMonth)) ensure(o.salesperson || "—").sales += val(o); });
-      paysRC.forEach(p => {
-        if (String(p.date).slice(0, 7) === thisMonth) ensure(p.salesperson || "—").collected += num(p.amount);
-        if (p.state === "in_process") ensure(p.salesperson || "—").transit += num(p.amount);
+    /* ---- payments panels: the twin of the invoice cards, on the payment
+       basis (dashboard_payments; cancelled excluded at load). States:
+       paid = money in hand, in_process = with the courier (in transit).
+       Groups honor the rep/customer filter because the input rows (paysRC)
+       are already filtered. Names are DB strings → D.esc. ---- */
+    function payRepAgg(rows) {
+      const m = new Map();
+      rows.forEach(p => {
+        const k = p.user_id != null ? p.user_id : (p.salesperson || "—");
+        if (!m.has(k)) m.set(k, { salesperson: p.salesperson || "— غير محدد / Unassigned", n: 0, amount: 0, paid: 0, transit: 0 });
+        const e = m.get(k);
+        e.n++; e.amount += num(p.amount);
+        if (p.state === "in_process") e.transit += num(p.amount); else e.paid += num(p.amount);
       });
-      alerts.forEach(a => { if (a.level === "critical" && m[a.salesperson || "—"]) m[a.salesperson || "—"].risky++; });
-      const list = Object.values(m).filter(r => r.sales > 0 || r.collected > 0)
-        .sort((a, b) => (b.sales - a.sales) || (b.collected - a.collected)).slice(0, 10);
-      if (!list.length) { box.innerHTML = `<div class="empty">${D.t("no_data")}</div>`; return; }
+      return [...m.values()].sort((a, b) => b.amount - a.amount);
+    }
+    const payRepHead = () =>
+      `<thead><tr><th>${D.t("col_rep")}</th><th>${D.t("col_count")}</th><th>${D.t("col_amount")}</th><th>${D.t("pay_transit")}</th><th>${D.t("pay_paid")}</th></tr></thead>`;
+    const payRepRows = list => list.map(r => `<tr>
+        <td class="strong">${D.esc(r.salesperson)}</td>
+        <td class="amt">${D.fmtNum(r.n)}</td>
+        <td class="amt">${D.fmtMoney(r.amount)}</td>
+        <td class="amt">${r.transit > 0 ? `<span class="danger">${D.fmtMoney(r.transit)}</span>` : `<span class="muted">0</span>`}</td>
+        <td class="amt"><span class="ok">${D.fmtMoney(r.paid)}</span></td>
+      </tr>`).join("");
+
+    // today's payments: status split (paid / in transit) + per-rep table
+    function renderPayToday(rows) {
+      const box = document.getElementById("payTodayBox");
+      if (!rows.length) { box.innerHTML = `<div class="empty">${D.t("no_data")}</div>`; return; }
+      const sum = a => a.reduce((s, p) => s + num(p.amount), 0);
+      const paid = rows.filter(p => p.state === "paid");
+      const pend = rows.filter(p => p.state === "in_process");
+      const statusRow = (label, a) => `<tr>
+        <td class="strong">${label}</td>
+        <td class="amt">${D.fmtNum(a.length)}</td>
+        <td class="amt">${D.fmtMoney(sum(a))}</td>
+      </tr>`;
       box.innerHTML = `
         <table class="dt">
-          <thead><tr><th>${D.t("col_rep")}</th><th>${D.t("col_sales")}</th><th>${D.t("col_collected")}</th><th>${D.t("coll_vs_sales")}</th><th>${D.t("col_transit")}</th><th>${D.t("col_risky")}</th></tr></thead>
+          <thead><tr><th>${D.t("ack_status")}</th><th>${D.t("col_count")}</th><th>${D.t("col_amount")}</th></tr></thead>
           <tbody>
-          ${list.map(r => {
-            const pct = r.sales > 0 ? Math.round(r.collected / r.sales * 100) : null;
-            const cls = pct == null ? "muted" : (pct >= 70 ? "ok" : (pct >= 40 ? "" : "danger"));
-            return `<tr>
-              <td class="strong">${D.esc(r.rep)}</td>
-              <td class="amt">${D.fmtMoney(r.sales)}</td>
-              <td class="amt">${D.fmtMoney(r.collected)}</td>
-              <td><span class="${cls}">${pct != null ? pct + "%" : "—"}</span></td>
-              <td class="amt muted">${r.transit ? D.fmtMoney(r.transit) : "—"}</td>
-              <td>${r.risky ? `<span class="danger">${D.fmtNum(r.risky)}</span>` : "—"}</td>
-            </tr>`; }).join("")}
+            ${statusRow("<b>" + D.t("pay_total") + "</b>", rows)}
+            ${statusRow(`<span class="ok">✓ ${D.t("pay_paid")}</span>`, paid)}
+            ${statusRow(D.t("pay_transit"), pend)}
           </tbody>
+        </table>
+        <div class="panel-head" style="border-top:1px solid var(--bdr)"><h2>${D.t("pay_by_rep")}</h2></div>
+        <table class="dt">
+          ${payRepHead()}
+          <tbody>${payRepRows(payRepAgg(rows))}</tbody>
         </table>`;
+    }
+
+    // month-to-date payments per salesperson — twin of the month invoices table
+    function renderPayMonthReps(paysRC) {
+      const box = document.getElementById("payMonthRepBox");
+      const rows = paysRC.filter(p => String(p.date).slice(0, 7) === thisMonth);
+      if (!rows.length) { box.innerHTML = `<div class="empty">${D.t("no_data")}</div>`; return; }
+      const total = rows.reduce((s, p) => s + num(p.amount), 0);
+      box.innerHTML = `
+        <table class="dt">
+          ${payRepHead()}
+          <tbody>${payRepRows(payRepAgg(rows))}</tbody>
+        </table>
+        <div class="muted" style="padding:9px 14px;font-size:12px">
+          ${thisMonth} · ${D.fmtNum(rows.length)} ${D.t("payments_count")} ·
+          <span class="ok">${D.fmtMoney(total)}</span>
+        </div>`;
     }
 
     // today's customer invoices by status — the accounting view of the day.
@@ -480,39 +515,6 @@
           ${invMonth.month} · ${D.fmtNum(invMonth.count)} ${D.t("invoices_w")} ·
           <span class="ok">${D.fmtMoney(num(invMonth.collected))}</span> ${D.t("collected_so_far")}
         </div>`;
-    }
-
-    // cash physically in transit, grouped by the courier journal that holds it
-    function renderTransit(paysRC) {
-      const box = document.getElementById("transitBox");
-      const pend = paysRC.filter(p => p.state === "in_process");
-      if (!pend.length) { box.innerHTML = `<div class="empty">${D.t("no_data")}</div>`; return; }
-      const m = {};
-      pend.forEach(p => {
-        const k = p.journal || p.salesperson || "—";
-        if (!m[k]) m[k] = { holder: k, n: 0, amt: 0, oldest: String(p.date).slice(0, 10) };
-        const e = m[k];
-        e.n++; e.amt += num(p.amount);
-        const d = String(p.date).slice(0, 10);
-        if (d && d < e.oldest) e.oldest = d;
-      });
-      const list = Object.values(m).sort((a, b) => b.amt - a.amt).slice(0, 10);
-      const cut3 = D.addDays(today, -3);
-      box.innerHTML = `
-        <table class="dt">
-          <thead><tr><th>${D.t("col_holder")}</th><th>${D.t("payments_count")}</th><th>${D.t("col_amount")}</th><th>${D.t("col_oldest")}</th></tr></thead>
-          <tbody>
-          ${list.map(r => {
-            const age = Math.round((Date.parse(today) - Date.parse(r.oldest)) / 864e5);
-            const old = r.oldest < cut3;
-            return `<tr>
-              <td class="strong">${D.esc(r.holder)}</td>
-              <td>${D.fmtNum(r.n)}</td>
-              <td class="amt">${D.fmtMoney(r.amt)}</td>
-              <td><span class="${old ? "danger" : "muted"}">${D.fmtDate(r.oldest)}${age > 0 ? ` · ${D.fmtNum(age)} ${D.t("days_word")}` : ""}</span></td>
-            </tr>`; }).join("")}
-          </tbody>
-        </table>`;
     }
 
     // weekly confirmed revenue (Sat-start weeks) — trajectory beyond the month

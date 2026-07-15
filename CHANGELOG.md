@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-07-15 — Payments cards mirror the invoice cards (v46)
+
+- Removed by owner request: **"Cash in transit — who holds it now?"** and
+  **"Reps — sales vs collected (this month)"** (leaderboard).
+- New, on the payment basis (`dashboard_payments`, cancelled excluded at
+  load): **"Today's payments by status"** (total / received / in-transit ×
+  count · amount) with a per-salesperson table underneath (count · amount ·
+  in transit · received), and **"This month's payments by salesperson"**
+  under the month band — the exact twin of the invoice cards.
+- Groups key on `user_id` (name fallback), honor the page's rep/customer
+  filter (input rows are pre-filtered), names `D.esc`-escaped; panels
+  tagged `data-src="dashboard_payments"` so the admin hide toggle covers
+  them.
+- Top-debtors and top-customers panels became full-width (their grid
+  partners were the removed panels). DATA_SOURCES feeds updated.
+- Cache-bust v=46.
+
 ## 2026-07-15 — Hide data sources also hides the KPI numbers (v45)
 
 - Fix: hiding a source (v44) only hid the static panels; the Overview KPI
