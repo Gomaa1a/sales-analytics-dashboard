@@ -980,15 +980,18 @@
     const today = bagToday();
     const [rowsRaw, repNames] = await Promise.all([
       sbGetAll(
-        `dashboard_invoices?select=invoice_id,name,user_id,salesperson,amount_total,amount_residual,state` +
+        `dashboard_invoices?select=invoice_id,name,user_id,salesperson,partner_name,amount_total,amount_residual,state` +
         `&invoice_date=eq.${today}&name=like.INV*`),
       cachedApi("rep_names", loadRepNames)
     ]);
     const rows = dedupeBy(rowsRaw, "invoice_id");
     const num2 = n => Number(n) || 0;
+    const repName = x => x.salesperson || repNames.get(x.user_id) ||
+      (x.user_id != null ? "ID " + x.user_id : "— غير محدد / Unassigned");
     const bucket = () => ({ n: 0, value: 0, residual: 0 });
     const out = { posted: bucket(), paid: bucket(), partial: bucket(), unpaid: bucket(), cancelled: bucket() };
     const reps = new Map();
+    const postedRows = []; // invoice-level rows so pages can filter by rep AND customer
     let collected = 0;
     for (const x of rows) {
       const t = num2(x.amount_total), res = num2(x.amount_residual);
@@ -1000,13 +1003,14 @@
       if (res === 0) add(out.paid);
       else if (res < t) add(out.partial);
       else add(out.unpaid);
+      postedRows.push({ user_id: x.user_id != null ? x.user_id : null,
+        salesperson: repName(x), partner_name: x.partner_name || "", value: t, residual: res });
       const rk = x.user_id != null ? x.user_id : (x.salesperson || "—");
       if (!reps.has(rk)) reps.set(rk, {
         user_id: x.user_id != null ? x.user_id : null,
         // the invoice's own name snapshot wins; customer-master fallback
         // covers rows synced before the column existed
-        salesperson: x.salesperson || repNames.get(x.user_id) ||
-          (x.user_id != null ? "ID " + x.user_id : "— غير محدد / Unassigned"),
+        salesperson: repName(x),
         n: 0, value: 0, residual: 0
       });
       add(reps.get(rk));
@@ -1014,6 +1018,7 @@
     return { generated_at: new Date().toISOString(), currency: CFG.CURRENCY, today,
       posted: out.posted, paid: out.paid, partial: out.partial,
       unpaid: out.unpaid, cancelled: out.cancelled, collected_today: collected,
+      posted_rows: postedRows,
       by_rep: [...reps.values()].sort((a, b) => b.value - a.value) };
   }
 
@@ -1043,13 +1048,16 @@
     const lastMonth = lastMonthStart.slice(0, 7);
     const [rowsRaw, repNames] = await Promise.all([
       sbGetAll(
-        `dashboard_invoices?select=invoice_id,user_id,salesperson,amount_total,amount_residual,state,invoice_date` +
+        `dashboard_invoices?select=invoice_id,user_id,salesperson,partner_name,amount_total,amount_residual,state,invoice_date` +
         `&invoice_date=gte.${lastMonthStart}&name=like.INV*&state=eq.posted`),
       cachedApi("rep_names", loadRepNames)
     ]);
     const rows = dedupeBy(rowsRaw, "invoice_id");
     const num2 = n => Number(n) || 0;
+    const repName = x => x.salesperson || repNames.get(x.user_id) ||
+      (x.user_id != null ? "ID " + x.user_id : "— غير محدد / Unassigned");
     const reps = new Map();
+    const postedRows = []; // invoice-level, so pages can filter by rep AND customer
     let value = 0, count = 0, collected = 0, lastMTD = 0, lastAny = 0;
     for (const x of rows) {
       const d = String(x.invoice_date).slice(0, 10);
@@ -1058,12 +1066,13 @@
         value += t; count++;
         const res = num2(x.amount_residual);
         collected += t - res;
+        postedRows.push({ user_id: x.user_id != null ? x.user_id : null,
+          salesperson: repName(x), partner_name: x.partner_name || "", value: t, residual: res });
         // per-rep slice of the month's posted book (same keying as today's)
         const rk = x.user_id != null ? x.user_id : (x.salesperson || "—");
         if (!reps.has(rk)) reps.set(rk, {
           user_id: x.user_id != null ? x.user_id : null,
-          salesperson: x.salesperson || repNames.get(x.user_id) ||
-            (x.user_id != null ? "ID " + x.user_id : "— غير محدد / Unassigned"),
+          salesperson: repName(x),
           n: 0, value: 0, residual: 0
         });
         const r = reps.get(rk); r.n++; r.value += t; r.residual += res;
@@ -1075,6 +1084,7 @@
     return { generated_at: new Date().toISOString(), currency: CFG.CURRENCY,
       month: thisMonth, value, count, collected,
       last_mtd: lastMTD, last_month_has_data: lastAny > 0,
+      posted_rows: postedRows,
       by_rep: [...reps.values()].sort((a, b) => b.value - a.value) };
   }
 

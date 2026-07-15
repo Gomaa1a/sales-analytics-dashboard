@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-07-15 — Collapsible cards + full rep list + customer filter on invoice tables (v47)
+
+- The four invoice/payment cards (today by status+rep, month by rep) are
+  now **collapsible** — click the panel head to fold/unfold; the choice
+  persists per panel (localStorage).
+- The salesperson dropdown now includes **every rep from the `salespeople`
+  master** (plus every spelling seen in orders/invoices/payments), not
+  only reps with activity in the loaded window.
+- **Customer search now narrows the invoice by-salesperson tables** too:
+  the builders return invoice-level rows (`posted_rows` with
+  partner_name), and the page aggregates client-side after applying both
+  filters. Rep matching is uid-aware everywhere (the same rep can be
+  spelled differently in orders vs invoices vs payments) — payments
+  filtering upgraded to uid-aware as well.
+- Cache-bust v=47.
+
 ## 2026-07-15 — n8n payments fix: refunds counted (no asset changes)
 
 - Found by the owner comparing Odoo's Customer Payments day totals:
