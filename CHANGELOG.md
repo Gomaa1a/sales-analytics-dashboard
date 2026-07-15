@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-07-15 — Trim the Overview month band (v43)
+
+- Removed by owner request: the **Outstanding overdue** exec card (with its
+  aging strip / credit-exposure / due-7d sub-lines), the **Quotations**
+  mini stat, the **Value at risk** block, and **The story in one line**
+  narrative. The month band is now two cards (invoiced vs target · cash)
+  plus the mini row (confirmed · customers · cancelled · top-10 conc ·
+  top governorate).
+- Dead code removed with them: `buildStory`, the overdue/concentration and
+  DSO/exposure computations, the critical-alerts value-at-risk sum, and the
+  unused quotation totals. Top-debtors table and all other panels unchanged.
+- Cache-bust v=43.
+
 ## 2026-07-15 — "This month's invoices by salesperson" (v42)
 
 - New panel under the month exec band: month-to-date POSTED invoices per
