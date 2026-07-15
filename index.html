@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Sales Command Center</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=42" />
+  <link rel="stylesheet" href="assets/css/style.css?v=43" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -30,22 +30,11 @@
       <div class="panel-body" style="padding:0"><div id="invTodayBox"></div></div>
     </div>
 
-    <!-- Row 2 — THE MONTH: sales vs target · cash · overdue · uninvoiced -->
+    <!-- Row 2 — THE MONTH: invoiced vs target · cash collected -->
     <h2 class="sect-h" id="secMonth"></h2>
     <section class="exec">
       <div class="exec-heads" id="execHeads"></div>
       <div class="exec-mini" id="execMini"></div>
-      <div class="exec-foot">
-        <div class="exec-story">
-          <div class="ex-l" id="storyLbl"></div>
-          <p id="storyText"></p>
-        </div>
-        <div class="exec-var">
-          <div class="ex-l" id="varLbl"></div>
-          <div class="exec-n" id="varNum">—</div>
-          <div class="ex-sub" id="varSub"></div>
-        </div>
-      </div>
     </section>
     <div class="panel" style="margin-bottom:16px">
       <div class="panel-head"><h2 id="invMonthRepTitle"></h2></div>
@@ -95,9 +84,9 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=42"></script>
-  <script src="assets/js/auth.js?v=42"></script>
-  <script src="assets/js/common.js?v=42"></script>
+  <script src="assets/js/config.js?v=43"></script>
+  <script src="assets/js/auth.js?v=43"></script>
+  <script src="assets/js/common.js?v=43"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -110,8 +99,6 @@
     document.getElementById("transitTitle").textContent = D.t("transit_title");
     document.getElementById("debtorsTitle").textContent = D.t("ov_top_debtors");
     document.getElementById("leaderTitle").textContent = D.t("ov_leaderboard");
-    document.getElementById("storyLbl").textContent = D.t("ex_story");
-    document.getElementById("varLbl").textContent = D.t("ex_var");
     document.getElementById("secToday").textContent = D.t("sec_today");
     document.getElementById("secMonth").textContent = D.t("sec_month");
     document.getElementById("secNames").textContent = D.t("sec_names");
@@ -215,8 +202,6 @@
       const rangeRows = allRows.filter(o => { const d = dayOf(o); return d >= from && d <= to && matchRC(o); });
       const rConf = rangeRows.filter(isConf);
       const rCancel = rangeRows.filter(o => o.state === "cancel");
-      const rQuote = rangeRows.filter(o => o.state === "draft" || o.state === "sent");
-      const rQuoteVal = rQuote.reduce((s, o) => s + val(o), 0);
       const rConfVal = rConf.reduce((s, o) => s + val(o), 0);
       const rCancelVal = rCancel.reduce((s, o) => s + val(o), 0);
       const customers = new Set(rConf.map(o => o.partner_name).filter(Boolean)).size;
@@ -289,12 +274,9 @@
       sect("invoices-today", () => renderInvToday(salesToday));
       sect("invoices-month-reps", renderInvMonthReps);
 
-      // ----- overdue / receivable (respect rep + customer filter) -----
+      // ----- top debtors list (respect rep + customer filter) -----
       const debtRC = debtRows.filter(r => (!v.rep || r.salesperson === v.rep) && (!v.cust || String(r.name || "").toLowerCase().includes(v.cust)));
-      const overdue = debtRC.reduce((s, r) => s + r.overdue, 0);
       const byOver = [...debtRC].sort((a, b) => b.overdue - a.overdue);
-      const top10 = byOver.slice(0, 10).reduce((s, r) => s + r.overdue, 0);
-      const conc = overdue > 0 ? Math.round(top10 / overdue * 100) : 0;
 
       // ----- hero cards -----
       const barCls = paceVs == null ? "" : (paceVs >= 100 ? "" : (paceVs >= 80 ? "warn" : "bad"));
@@ -306,31 +288,10 @@
             ? `${D.fmtNum(invMonth.count)} ${D.t("invoices_w")} · ${D.t("ex_rev_collected")}: <b>${D.fmtMoney(num(invMonth.collected))}</b>`
             : D.t("loading")}${momNote}</div>`;
 
-      // receivables aging + total exposure — from the collections snapshot the
-      // page already downloads (label the basis: "as of latest snapshot")
-      const db = collSnap && collSnap.dso_buckets;
-      let dsoHtml = "";
-      if (db) {
-        const dTot = num(db.le30) + num(db.b31_60) + num(db.gt60);
-        if (dTot > 0) {
-          const pc = x => Math.round(num(x) / dTot * 100);
-          dsoHtml =
-            `<div class="dso-strip"><i class="d-g" style="width:${pc(db.le30)}%"></i><i class="d-a" style="width:${pc(db.b31_60)}%"></i><i class="d-r" style="width:${pc(db.gt60)}%"></i></div>` +
-            `<div class="ex-sub">${D.t("dso_title")}: <b class="ok">${D.fmtMoney(db.le30)}</b> ${D.t("dso_le30")} · <b>${D.fmtMoney(db.b31_60)}</b> 31–60 · <b class="danger">${D.fmtMoney(db.gt60)}</b> ${D.t("dso_gt60")}</div>`;
-        }
-      }
-      const expHtml = (collSnap && num(collSnap.credit_exposure) > 0
-        ? `<div class="ex-sub">${D.t("credit_exposure")}: <b>${D.fmtMoney(num(collSnap.credit_exposure))}</b> <span style="opacity:.65">(${D.t("as_of_snapshot")})</span></div>`
-        : "") + (collSnap && num(collSnap.due_7d) > 0
-        ? `<div class="ex-sub">${D.t("due_7d")}: <b>${D.fmtMoney(num(collSnap.due_7d))}</b></div>`
-        : "");
-
       document.getElementById("execHeads").innerHTML =
         card(D.t("ex_revenue"), revMonth != null ? D.fmtMoney(revMonth) : "—", momValid ? deltaTag(momRev) : "") + targetBlock + `</div>` +
         card(D.t("ex_cash"), D.fmtMoney(cashMonth), "") +
-          `<div class="ex-sub" style="margin-top:9px">${D.t("coll_vs_sales")}: <b>${vsSales != null ? vsSales + "%" : "—"}</b></div></div>` +
-        `<div class="exec-card"><div class="ex-l">${D.t("ex_overdue")}</div><div class="exec-row"><div class="exec-n" style="color:var(--red)">${D.fmtMoney(overdue)}</div></div>` +
-          `<div class="ex-sub" style="margin-top:9px">${D.t("ex_conc_sub")}: <b>${conc}%</b></div>${dsoHtml}${expHtml}</div>`;
+          `<div class="ex-sub" style="margin-top:9px">${D.t("coll_vs_sales")}: <b>${vsSales != null ? vsSales + "%" : "—"}</b></div></div>`;
 
       // ----- minis (filter-range) -----
       // "Top governorate" only considers REAL governorates — a missing city in
@@ -360,22 +321,11 @@
 
       document.getElementById("execMini").innerHTML =
         mini(D.t("ov_confirmed"), D.fmtNum(rConf.length), D.fmtMoney(rConfVal)) +
-        mini(D.t("ov_quotes"), D.fmtNum(rQuote.length),
-          rQuote.length ? D.fmtMoney(rQuoteVal) : "&nbsp;") +
         mini(D.t("ov_customers"), D.fmtNum(customers), `${from} → ${to}`) +
         mini(D.t("ov_cancelled"), D.fmtNum(rCancel.length),
           rCancel.length ? `${D.t("cancel_rate")}: <b>${cancelRate}%</b> · ${D.fmtMoney(rCancelVal)}` : "&nbsp;") +
         mini(D.t("conc10"), `${top10Share}%`, D.t("of_period_rev")) +
         mini(D.t("ex_top_gov"), topGov ? topGov[0] : "—", topGov ? `${govShare}% ${D.t("share")}` : "&nbsp;");
-
-      // ----- value at risk (critical alerts) -----
-      const crit = alerts.filter(a => a.level === "critical");
-      const var$ = crit.reduce((s, a) => s + num(a.amount_total), 0);
-      document.getElementById("varNum").textContent = D.fmtMoney(var$);
-      document.getElementById("varSub").innerHTML = `${D.fmtNum(crit.length)} ${D.t("ex_var_sub")}`;
-
-      // ----- narrative -----
-      document.getElementById("storyText").innerHTML = buildStory({ revMonth, momRev, hasLast: momValid, attain, pace, vsSales, overdue, conc, topGov, govShare });
 
       // ----- action tables + charts -----
       // each section individually guarded: one failure logs to the console
@@ -586,27 +536,6 @@
             } } } },
           scales: { y: { beginAtZero: true, ticks: { callback: v => D.fmtMoney(v) } } } }
       });
-    }
-
-    function buildStory(x) {
-      const m = D.fmtMoney;
-      const dir = p => p >= 0 ? "▲" : "▼";
-      if (D.isAR()) {
-        let s = `المفوتر هذا الشهر <b>${x.revMonth != null ? m(x.revMonth) : "—"}</b>`;
-        if (x.hasLast) s += ` (${dir(x.momRev)} ${Math.abs(x.momRev)}% عن نفس الأيام من الشهر الماضي)`;
-        if (x.attain != null) s += `، أي <b>${x.attain}%</b> من الهدف، والمتوقّع <b>${m(x.pace)}</b> بنهاية الشهر`;
-        if (x.vsSales != null) s += `. التحصيل <b>${x.vsSales}%</b> من المفوتر`;
-        if (x.overdue > 0) s += `، والمتأخرات <b>${m(x.overdue)}</b> يتركّز <b>${x.conc}%</b> منها في أكبر ١٠ عملاء`;
-        if (x.topGov) s += `. أعلى محافظة: <b>${D.esc(x.topGov[0])}</b> (${x.govShare}%)`;
-        return s + ".";
-      }
-      let s = `Invoiced this month is <b>${x.revMonth != null ? m(x.revMonth) : "—"}</b>`;
-      if (x.hasLast) s += ` (${dir(x.momRev)} ${Math.abs(x.momRev)}% vs same days last month)`;
-      if (x.attain != null) s += `, i.e. <b>${x.attain}%</b> of target, on pace for <b>${m(x.pace)}</b> by month-end`;
-      if (x.vsSales != null) s += `. Cash collected is <b>${x.vsSales}%</b> of invoiced`;
-      if (x.overdue > 0) s += `, and overdue of <b>${m(x.overdue)}</b> is <b>${x.conc}%</b> concentrated in the top 10 customers`;
-      if (x.topGov) s += `. Top governorate: <b>${D.esc(x.topGov[0])}</b> (${x.govShare}%)`;
-      return s + ".";
     }
 
     function drawByDay(rows) {
