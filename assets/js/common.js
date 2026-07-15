@@ -753,8 +753,14 @@
       el.style.display = hide ? "none" : "";
     });
   }
+  // Synchronous re-apply from the cached/local set — no network. Pages call
+  // this at the end of every render so dynamically-rebuilt tiles (KPI cards,
+  // exec cards, minis) get hidden again after each poll.
+  function applyHidden(root) {
+    applyHiddenTo(root, _hiddenSrc || hiddenSrcLocal());
+  }
   // Paint instantly from the last-known local copy (no flash on repeat loads),
-  // then reconcile with the server copy.
+  // then reconcile with the server copy. Called once per page from buildChrome.
   function applyDataSourceVisibility() {
     applyHiddenTo(document, hiddenSrcLocal());
     loadHiddenSources(true).then(set => applyHiddenTo(document, set)).catch(() => {});
@@ -1589,7 +1595,7 @@
     api, ackAlert, beep, toast, notify, buildChrome, setUpdated, renderSoundBtn,
     stateLabel, trustLabel, filterBar,
     govOf, govLabel, GOV, loadOrders, loadPayments, sbGetAll, sbGet, sbWrite, nextDay, bagDay, addDays, weekStartSat,
-    DATA_SOURCES, loadHiddenSources, setHiddenSources, applyDataSourceVisibility,
+    DATA_SOURCES, loadHiddenSources, setHiddenSources, applyDataSourceVisibility, applyHidden,
     cfg: CFG
   };
 })();

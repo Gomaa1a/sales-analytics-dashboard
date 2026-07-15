@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-07-15 — Hide data sources also hides the KPI numbers (v45)
+
+- Fix: hiding a source (v44) only hid the static panels; the Overview KPI
+  tiles, month exec cards, and minis are rebuilt on every poll, so their
+  numbers stayed visible. Each tile/card/mini now carries its own
+  `data-src`, and `applyHidden()` (new sync, cache-based, no network) is
+  re-run after every Overview render.
+- Also tagged the alerts & salespeople KPI grids (single-source pages).
+- e.g. hide **Invoices** → the "Invoiced today" KPI + "Invoiced this month"
+  card disappear too, not just the invoice tables.
+- Cache-bust v=45.
+
 ## 2026-07-15 — Admin: show/hide data sources + what-each-feeds (v44)
 
 - **Admin → Data sources** panel: one toggle per raw table

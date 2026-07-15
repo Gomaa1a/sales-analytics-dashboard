@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Sales Command Center</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=44" />
+  <link rel="stylesheet" href="assets/css/style.css?v=45" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -84,9 +84,9 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=44"></script>
-  <script src="assets/js/auth.js?v=44"></script>
-  <script src="assets/js/common.js?v=44"></script>
+  <script src="assets/js/config.js?v=45"></script>
+  <script src="assets/js/auth.js?v=45"></script>
+  <script src="assets/js/common.js?v=45"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -183,12 +183,14 @@
       ]);
     }
 
-    const kpi = (cls, label, n, sub) =>
-      `<div class="kpi ${cls}"><div class="kpi-l">${label}</div><div class="kpi-n">${n}</div><div class="kpi-sub">${sub || "&nbsp;"}</div></div>`;
-    const card = (lbl, n, extra) =>
-      `<div class="exec-card"><div class="ex-l">${lbl}</div><div class="exec-row"><div class="exec-n">${n}</div>${extra || ""}</div>`;
-    const mini = (lbl, v, d) =>
-      `<div class="ex-mini"><div class="ex-l">${lbl}</div><div class="ex-v">${v}</div><div class="ex-d">${d || "&nbsp;"}</div></div>`;
+    // `src` tags a tile with the raw table it comes from, so an admin who
+    // hides that source (D.applyHidden) removes just this tile.
+    const kpi = (cls, label, n, sub, src) =>
+      `<div class="kpi ${cls}"${src ? ` data-src="${src}"` : ""}><div class="kpi-l">${label}</div><div class="kpi-n">${n}</div><div class="kpi-sub">${sub || "&nbsp;"}</div></div>`;
+    const card = (lbl, n, extra, src) =>
+      `<div class="exec-card"${src ? ` data-src="${src}"` : ""}><div class="ex-l">${lbl}</div><div class="exec-row"><div class="exec-n">${n}</div>${extra || ""}</div>`;
+    const mini = (lbl, v, d, src) =>
+      `<div class="ex-mini"${src ? ` data-src="${src}"` : ""}><div class="ex-l">${lbl}</div><div class="ex-v">${v}</div><div class="ex-d">${d || "&nbsp;"}</div></div>`;
     const deltaTag = pct => `<span class="exec-delta ${pct >= 0 ? "up" : "down"}">${pct >= 0 ? "▲" : "▼"} ${Math.abs(pct)}%</span>`;
     const pctOf = (a, b) => b > 0 ? Math.round((a - b) / b * 100) : (a > 0 ? 100 : 0);
 
@@ -263,13 +265,13 @@
         kpi("", D.t("inv_today"), invPosted ? D.fmtMoney(invPosted.value) : "—",
           invPosted
             ? `${D.fmtNum(invPosted.n)} ${D.t("invoices_w")}${collectedPct != null ? ` · <span class="ok">${collectedPct}% ${D.t("collected_same_day")}</span>` : ""}`
-            : D.t("loading")) +
+            : D.t("loading"), "dashboard_invoices") +
         kpi("k-grn", D.t("coll_today"), D.fmtMoney(cashToday),
-          typicalTag(cashToday, typCash) || `${D.fmtNum(cashTodayRows.length)} ${D.t("payments_count")} · ${today}`) +
+          typicalTag(cashToday, typCash) || `${D.fmtNum(cashTodayRows.length)} ${D.t("payments_count")} · ${today}`, "dashboard_payments") +
         kpi("k-vio", D.t("ov_today_orders"), D.fmtNum(totalToday),
           `<span class="ok">✓ ${D.fmtNum(salesTodayRows.length)} ${D.t("ov_confirmed_short")}</span>` +
           ` · ${D.fmtNum(draftToday)} ${D.t("ov_quotes")}` +
-          ` · <span class="${cancelledToday ? "danger" : "muted"}">${D.fmtNum(cancelledToday)} ${D.t("ov_not_confirmed")}</span>`);
+          ` · <span class="${cancelledToday ? "danger" : "muted"}">${D.fmtNum(cancelledToday)} ${D.t("ov_not_confirmed")}</span>`, "dashboard_orders");
 
       sect("invoices-today", () => renderInvToday(salesToday));
       sect("invoices-month-reps", renderInvMonthReps);
@@ -289,8 +291,8 @@
             : D.t("loading")}${momNote}</div>`;
 
       document.getElementById("execHeads").innerHTML =
-        card(D.t("ex_revenue"), revMonth != null ? D.fmtMoney(revMonth) : "—", momValid ? deltaTag(momRev) : "") + targetBlock + `</div>` +
-        card(D.t("ex_cash"), D.fmtMoney(cashMonth), "") +
+        card(D.t("ex_revenue"), revMonth != null ? D.fmtMoney(revMonth) : "—", momValid ? deltaTag(momRev) : "", "dashboard_invoices") + targetBlock + `</div>` +
+        card(D.t("ex_cash"), D.fmtMoney(cashMonth), "", "dashboard_payments") +
           `<div class="ex-sub" style="margin-top:9px">${D.t("coll_vs_sales")}: <b>${vsSales != null ? vsSales + "%" : "—"}</b></div></div>`;
 
       // ----- minis (filter-range) -----
@@ -320,12 +322,12 @@
         ? Math.round(rCancel.length / (rConf.length + rCancel.length) * 100) : 0;
 
       document.getElementById("execMini").innerHTML =
-        mini(D.t("ov_confirmed"), D.fmtNum(rConf.length), D.fmtMoney(rConfVal)) +
-        mini(D.t("ov_customers"), D.fmtNum(customers), `${from} → ${to}`) +
+        mini(D.t("ov_confirmed"), D.fmtNum(rConf.length), D.fmtMoney(rConfVal), "dashboard_orders") +
+        mini(D.t("ov_customers"), D.fmtNum(customers), `${from} → ${to}`, "dashboard_orders") +
         mini(D.t("ov_cancelled"), D.fmtNum(rCancel.length),
-          rCancel.length ? `${D.t("cancel_rate")}: <b>${cancelRate}%</b> · ${D.fmtMoney(rCancelVal)}` : "&nbsp;") +
-        mini(D.t("conc10"), `${top10Share}%`, D.t("of_period_rev")) +
-        mini(D.t("ex_top_gov"), topGov ? topGov[0] : "—", topGov ? `${govShare}% ${D.t("share")}` : "&nbsp;");
+          rCancel.length ? `${D.t("cancel_rate")}: <b>${cancelRate}%</b> · ${D.fmtMoney(rCancelVal)}` : "&nbsp;", "dashboard_orders") +
+        mini(D.t("conc10"), `${top10Share}%`, D.t("of_period_rev"), "dashboard_orders") +
+        mini(D.t("ex_top_gov"), topGov ? topGov[0] : "—", topGov ? `${govShare}% ${D.t("share")}` : "&nbsp;", "dashboard_orders dashboard_customers");
 
       // ----- action tables + charts -----
       // each section individually guarded: one failure logs to the console
@@ -339,7 +341,12 @@
     }
 
     const sect = (name, fn) => { try { fn(); } catch (e) { console.error("[overview] " + name + ":", e); } };
-    function safeRender() { try { render(); } catch (e) { console.error("[overview] render failed:", e); } }
+    function safeRender() {
+      try { render(); } catch (e) { console.error("[overview] render failed:", e); }
+      // re-hide any tiles/cards whose source an admin switched off (dynamic
+      // content is rebuilt every poll, so this must run after each render)
+      if (D.applyHidden) D.applyHidden();
+    }
 
     function renderDebtors(top) {
       const box = document.getElementById("debtorsBox");
