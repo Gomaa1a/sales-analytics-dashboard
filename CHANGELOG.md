@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-07-16 — Fix: pagination lost rows on non-unique sort (v53)
+
+- **Root cause of "dashboard shows fewer rows than the DB"** (owner found
+  it: card Received 1,794 vs DB 1,843): `sbGetAll` fetches 1,000-row pages
+  IN PARALLEL, and queries ordered only by `date` (hundreds of ties) — or
+  not ordered at all — let tied rows drift between page requests. Drifted
+  rows appear twice (removed by dedupe) or never (silently lost). All NINE
+  paginated queries now carry a unique primary-key tiebreaker
+  (`order=…,payment_id.desc` / `order_id` / `invoice_id` / `partner_id`).
+  This also explains earlier small count gaps blamed on sync lag.
+- n8n (no assets): the incremental payments workflow gains a
+  `date >= 2026-07-01` floor — reconciling an OLD payment bumps its
+  write_date, which was re-inserting pre-July rows into the July-only
+  table (owner saw 177 reappear after the cleanup delete).
+- Cache-bust v=53.
+
 ## 2026-07-16 — Cash card: basis note + grand total incl. rejected/cancelled (v51–v52)
 
 - Third sub-line on "Cash collected — this month":

@@ -799,7 +799,7 @@
     const today = bagToday();
     const from = addDays(today, -13);
     const rows = dedupeBy(await sbGetAll(
-      `dashboard_payments?select=payment_id,date,amount,state,salesperson,user_id&date=gte.${from}&state=neq.canceled&order=date.desc`), "payment_id");
+      `dashboard_payments?select=payment_id,date,amount,state,salesperson,user_id&date=gte.${from}&state=neq.canceled&order=date.desc,payment_id.desc`), "payment_id");
     const days = [];
     for (let i = 13; i >= 0; i--) days.push(addDays(today, -i));
     const reps = new Map();
@@ -846,11 +846,11 @@
     // Odoo's Aged Receivable, which nets both signs per bucket.
     return dedupeBy(await sbGetAll(
       `dashboard_invoices?select=invoice_id,partner_id,partner_name,user_id,salesperson,amount_residual,due_date` +
-      `&state=eq.posted&amount_residual=neq.0`), "invoice_id");
+      `&state=eq.posted&amount_residual=neq.0&order=invoice_id.desc`), "invoice_id");
   }
   async function loadCustomerIdentity() {
     const rows = await sbGetAll(
-      `dashboard_customers?select=partner_id,complete_name,city,governorate,user_id,salesperson`);
+      `dashboard_customers?select=partner_id,complete_name,city,governorate,user_id,salesperson&order=partner_id.desc`);
     const m = new Map();
     rows.forEach(c => m.set(c.partner_id, c));
     return m;
@@ -927,7 +927,7 @@
     const [inv, idmap, riskRaw] = await Promise.all([
       loadOpenInvoices(),
       loadCustomerIdentity(),
-      sbGetAll(`${CFG.TABLES.orders}?select=order_id,amount_total&state=in.(sale,done)&level=eq.critical&date_order=gte.${monthStart}`)
+      sbGetAll(`${CFG.TABLES.orders}?select=order_id,amount_total&state=in.(sale,done)&level=eq.critical&date_order=gte.${monthStart}&order=order_id.desc`)
     ]);
     const risk = dedupeBy(riskRaw, "order_id");
     const num2 = n => Number(n) || 0;
@@ -973,7 +973,7 @@
   // user_id → rep name via the customer master's assigned rep.
   async function loadRepNames() {
     const rows = await sbGetAll(
-      `dashboard_customers?select=user_id,salesperson&user_id=not.is.null`);
+      `dashboard_customers?select=user_id,salesperson&user_id=not.is.null&order=partner_id.desc`);
     const m = new Map();
     rows.forEach(r => {
       if (r.user_id != null && r.salesperson && !m.has(r.user_id)) m.set(r.user_id, r.salesperson);
@@ -991,7 +991,7 @@
     const [rowsRaw, repNames] = await Promise.all([
       sbGetAll(
         `dashboard_invoices?select=invoice_id,name,user_id,salesperson,partner_name,amount_total,amount_residual,state` +
-        `&invoice_date=eq.${today}&name=like.INV*`),
+        `&invoice_date=eq.${today}&name=like.INV*&order=invoice_id.desc`),
       cachedApi("rep_names", loadRepNames)
     ]);
     const rows = dedupeBy(rowsRaw, "invoice_id");
@@ -1059,7 +1059,7 @@
     const [rowsRaw, repNames] = await Promise.all([
       sbGetAll(
         `dashboard_invoices?select=invoice_id,user_id,salesperson,partner_name,amount_total,amount_residual,state,invoice_date` +
-        `&invoice_date=gte.${lastMonthStart}&name=like.INV*&state=eq.posted`),
+        `&invoice_date=gte.${lastMonthStart}&name=like.INV*&state=eq.posted&order=invoice_id.desc`),
       cachedApi("rep_names", loadRepNames)
     ]);
     const rows = dedupeBy(rowsRaw, "invoice_id");
@@ -1590,7 +1590,9 @@
     o = o || {};
     const sel = o.select || "order_id,order_name,partner_name,salesperson,user_id,city,state,type_name,amount_total,level,invoice_count,date_order,create_date,customer";
     const f = o.dateField || "create_date";
-    let q = `${CFG.TABLES.orders}?select=${sel}&order=${f}.desc`;
+    // order_id tiebreaker: pagination pages are fetched separately, and a
+    // non-unique sort lets tied rows drift between pages (rows lost/duplicated)
+    let q = `${CFG.TABLES.orders}?select=${sel}&order=${f}.desc,order_id.desc`;
     if (o.from) q += `&${f}=gte.${o.from}`;
     if (o.to)   q += `&${f}=lt.${nextDay(o.to)}`;
     const rows = dedupeBy(await sbGetAll(q), "order_id");
@@ -1603,7 +1605,9 @@
     // ones — excluding both keeps every page's cash KPIs honest. Pass
     // all:true to also get canceled/rejected rows (the Overview shows them
     // as their own status rows, Odoo-style, but never sums them as cash).
-    let q = `dashboard_payments?select=${sel}&order=date.desc`;
+    // payment_id tiebreaker: many payments share one date; without a unique
+    // sort, parallel pagination loses/duplicates rows at page boundaries
+    let q = `dashboard_payments?select=${sel}&order=date.desc,payment_id.desc`;
     if (!o.all) q += `&state=not.in.(canceled,rejected)`;
     if (o.from) q += `&date=gte.${o.from}`;
     if (o.to)   q += `&date=lt.${nextDay(o.to)}`;
