@@ -1,12 +1,16 @@
 # Changelog
 
-## 2026-07-16 — Cash card: basis note + grand total incl. rejected/cancelled (v51)
+## 2026-07-16 — Cash card: basis note + grand total incl. rejected/cancelled (v51–v52)
 
 - Third sub-line on "Cash collected — this month":
   **"المحصّل = مستلَم + قيد التحويل"** (states the headline's basis) and
   **"الإجمالي شاملاً المرفوضة والملغاة: X"** — the figure that matches
   Odoo's payments-list footer, so the card explains both numbers.
-- Cache-bust v=51.
+- v52: every status on the card shows its **count** in Odoo's group-header
+  style — Received (1,842) · In transit (155) · Rejected (1) ·
+  Cancelled (23) — counts sum to the total-payments figure plus
+  rejected/cancelled, mirroring Odoo's day/month grouping exactly.
+- Cache-bust v=52.
 
 ## 2026-07-16 — Full Odoo-style payment status split; REJECTED never cash (v50)
 
