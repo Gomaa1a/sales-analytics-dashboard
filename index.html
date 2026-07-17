@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Sales Command Center</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=48" />
+  <link rel="stylesheet" href="assets/css/style.css?v=49" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -84,9 +84,9 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=48"></script>
-  <script src="assets/js/auth.js?v=48"></script>
-  <script src="assets/js/common.js?v=48"></script>
+  <script src="assets/js/config.js?v=49"></script>
+  <script src="assets/js/auth.js?v=49"></script>
+  <script src="assets/js/common.js?v=49"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -267,9 +267,13 @@
         (!v.rep || p.salesperson === v.rep || (vRepUid != null && p.user_id === vRepUid)) &&
         (!v.cust || String(p.partner_name || "").toLowerCase().includes(v.cust)));
       // cash card: straight sum of dashboard_payments (excl. cancelled) —
-      // the same basis as the today's-cash KPI
-      const cashMonth = paysRC.filter(p => String(p.date).slice(0, 7) === thisMonth).reduce((s, p) => s + num(p.amount), 0);
-      const vsSales = (revMonth != null && revMonth > 0) ? Math.round(cashMonth / revMonth * 100) : null;
+      // the same basis as the today's-cash KPI. Sub-line = payment count
+      // + received / in-transit split (owner request, replaced the
+      // collected÷invoiced ratio).
+      const monthPays = paysRC.filter(p => String(p.date).slice(0, 7) === thisMonth);
+      const cashMonth = monthPays.reduce((s, p) => s + num(p.amount), 0);
+      const mPaid = monthPays.filter(p => p.state === "paid").reduce((s, p) => s + num(p.amount), 0);
+      const mTransit = monthPays.filter(p => p.state === "in_process").reduce((s, p) => s + num(p.amount), 0);
 
       // ----- TODAY strip (always today, respects rep/customer filter) -----
       const salesTodayRows = confAll.filter(o => dayOf(o) === today);
@@ -335,7 +339,7 @@
       document.getElementById("execHeads").innerHTML =
         card(D.t("ex_revenue"), revMonth != null ? D.fmtMoney(revMonth) : "—", momValid ? deltaTag(momRev) : "", "dashboard_invoices") + targetBlock + `</div>` +
         card(D.t("ex_cash"), D.fmtMoney(cashMonth), "", "dashboard_payments") +
-          `<div class="ex-sub" style="margin-top:9px">${D.t("coll_vs_sales")}: <b>${vsSales != null ? vsSales + "%" : "—"}</b></div></div>`;
+          `<div class="ex-sub" style="margin-top:9px">${D.fmtNum(monthPays.length)} ${D.t("payments_count")} · <span class="ok">✓ ${D.t("pay_paid")}: <b>${D.fmtMoney(mPaid)}</b></span> · ${D.t("pay_transit")}: <b>${D.fmtMoney(mTransit)}</b></div></div>`;
 
       // ----- minis (filter-range) -----
       // "Top governorate" only considers REAL governorates — a missing city in
@@ -439,10 +443,11 @@
         <td class="amt"><span class="ok">${D.fmtMoney(r.paid)}</span></td>
       </tr>`).join("");
 
-    // today's payments: status split (paid / in transit) + per-rep table
+    // today's payments: status split (paid / in transit) + per-rep table.
+    // Renders the status skeleton even with ZERO rows — an empty card told
+    // the reader nothing; zeros against the familiar categories do.
     function renderPayToday(rows) {
       const box = document.getElementById("payTodayBox");
-      if (!rows.length) { box.innerHTML = `<div class="empty">${D.t("no_data")}</div>`; return; }
       const sum = a => a.reduce((s, p) => s + num(p.amount), 0);
       const paid = rows.filter(p => p.state === "paid");
       const pend = rows.filter(p => p.state === "in_process");
@@ -451,6 +456,7 @@
         <td class="amt">${D.fmtNum(a.length)}</td>
         <td class="amt">${D.fmtMoney(sum(a))}</td>
       </tr>`;
+      const repRows = payRepRows(payRepAgg(rows));
       box.innerHTML = `
         <table class="dt">
           <thead><tr><th>${D.t("ack_status")}</th><th>${D.t("col_count")}</th><th>${D.t("col_amount")}</th></tr></thead>
@@ -461,10 +467,10 @@
           </tbody>
         </table>
         <div class="panel-head" style="border-top:1px solid var(--bdr)"><h2>${D.t("pay_by_rep")}</h2></div>
-        <table class="dt">
+        ${repRows ? `<table class="dt">
           ${payRepHead()}
-          <tbody>${payRepRows(payRepAgg(rows))}</tbody>
-        </table>`;
+          <tbody>${repRows}</tbody>
+        </table>` : `<div class="empty">${D.t("no_data")}</div>`}`;
     }
 
     // month-to-date payments per salesperson — twin of the month invoices table
