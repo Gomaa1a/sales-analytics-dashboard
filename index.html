@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Sales Command Center</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=50" />
+  <link rel="stylesheet" href="assets/css/style.css?v=51" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -84,9 +84,9 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=50"></script>
-  <script src="assets/js/auth.js?v=50"></script>
-  <script src="assets/js/common.js?v=50"></script>
+  <script src="assets/js/config.js?v=51"></script>
+  <script src="assets/js/auth.js?v=51"></script>
+  <script src="assets/js/common.js?v=51"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -344,7 +344,8 @@
         card(D.t("ex_revenue"), revMonth != null ? D.fmtMoney(revMonth) : "—", momValid ? deltaTag(momRev) : "", "dashboard_invoices") + targetBlock + `</div>` +
         card(D.t("ex_cash"), D.fmtMoney(cashMonth), "", "dashboard_payments") +
           `<div class="ex-sub" style="margin-top:9px">${D.fmtNum(monthPays.length)} ${D.t("payments_count")} · <span class="ok">✓ ${D.t("pay_paid")}: <b>${D.fmtMoney(mPaid)}</b></span> · ${D.t("pay_transit")}: <b>${D.fmtMoney(mTransit)}</b></div>` +
-          `<div class="ex-sub"><span class="danger">${D.t("pay_rejected")}: <b>${D.fmtMoney(mRej)}</b></span> · <span style="opacity:.7">${D.t("pay_cancelled")}: <b>${D.fmtMoney(mCanc)}</b></span> <span style="opacity:.6">(${D.t("pay_excluded_note")})</span></div></div>`;
+          `<div class="ex-sub"><span class="danger">${D.t("pay_rejected")}: <b>${D.fmtMoney(mRej)}</b></span> · <span style="opacity:.7">${D.t("pay_cancelled")}: <b>${D.fmtMoney(mCanc)}</b></span> <span style="opacity:.6">(${D.t("pay_excluded_note")})</span></div>` +
+          `<div class="ex-sub"><span style="opacity:.75">${D.t("pay_cash_basis")}</span> · ${D.t("pay_grand_total")}: <b>${D.fmtMoney(cashMonth + mRej + mCanc)}</b></div></div>`;
 
       // ----- minis (filter-range) -----
       // "Top governorate" only considers REAL governorates — a missing city in

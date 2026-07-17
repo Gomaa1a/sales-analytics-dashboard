@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-07-16 — Cash card: basis note + grand total incl. rejected/cancelled (v51)
+
+- Third sub-line on "Cash collected — this month":
+  **"المحصّل = مستلَم + قيد التحويل"** (states the headline's basis) and
+  **"الإجمالي شاملاً المرفوضة والملغاة: X"** — the figure that matches
+  Odoo's payments-list footer, so the card explains both numbers.
+- Cache-bust v=51.
+
 ## 2026-07-16 — Full Odoo-style payment status split; REJECTED never cash (v50)
 
 - Owner's Odoo month view showed a **Rejected** state (bounced payments)
