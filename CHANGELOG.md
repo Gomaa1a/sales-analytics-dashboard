@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-07-16 — Cash card sub-line + payments card never blank (v49)
+
+- **"Cash collected — this month"**: the "Collected ÷ invoiced %" sub-line
+  is removed (owner request; the ratio still lives on the Collections
+  page). In its place: **payment count + the received / in-transit split**
+  of the month's cash.
+- **"Today's payments by status"** now always renders its three category
+  rows (total / received / in-transit) with zeros instead of an empty
+  body — the reader sees the buckets we classify by even before the
+  first payment of the day; the by-rep section shows "no data" until
+  rows exist.
+- Cache-bust v=49.
+
 ## 2026-07-16 — Shorter Overview: paired cards, capped heights (v48)
 
 - The Overview was too long. The today invoice/payment cards now sit
