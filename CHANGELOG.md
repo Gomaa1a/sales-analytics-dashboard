@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-07-16 — Full Odoo-style payment status split; REJECTED never cash (v50)
+
+- Owner's Odoo month view showed a **Rejected** state (bounced payments)
+  we never handled — worse, the dashboard was silently COUNTING rejected
+  rows as collected cash (only `canceled` was excluded). `loadPayments`
+  now excludes both by default; new `all: true` option loads every state.
+- **Cash collected — this month**: second sub-line shows Rejected (red)
+  and Cancelled amounts, labeled "not counted as cash". Headline stays
+  received + in-transit.
+- **Today's payments by status** now mirrors Odoo's grouping exactly:
+  Total / ✓ Received / In transit / Rejected / Cancelled, plus a footer
+  with the collected figure. Per-rep table aggregates CASH rows only.
+- Fixture with the owner's real month numbers: cash = 662,730,500 while
+  Odoo's grand total 669,331,000 = cash + rejected 150,000 + cancelled
+  6,450,500 — the split explains the difference on-screen.
+- Cache-bust v=50.
+
 ## 2026-07-16 — Cash card sub-line + payments card never blank (v49)
 
 - **"Cash collected — this month"**: the "Collected ÷ invoiced %" sub-line

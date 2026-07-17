@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Sales Command Center</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=49" />
+  <link rel="stylesheet" href="assets/css/style.css?v=50" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -84,9 +84,9 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=49"></script>
-  <script src="assets/js/auth.js?v=49"></script>
-  <script src="assets/js/common.js?v=49"></script>
+  <script src="assets/js/config.js?v=50"></script>
+  <script src="assets/js/auth.js?v=50"></script>
+  <script src="assets/js/common.js?v=50"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -187,7 +187,7 @@
         [allRows, payments] = await Promise.all([
           D.loadOrders({ from: prevDay(from), to, dateField: "date_order",
             select: "order_id,order_name,partner_name,salesperson,user_id,city,state,amount_total,create_date,date_order,dashboard_customers(governorate,city)" }),
-          D.loadPayments({ from, to })
+          D.loadPayments({ from, to, all: true }) // all states: the status cards show rejected/cancelled rows (never as cash)
         ]);
         loadedFrom = from; loadedTo = to;
         fb.setReps(allRows.map(o => o.salesperson));
@@ -263,17 +263,21 @@
       // uid-aware rep matching: the dropdown may hold a different spelling
       // of the same rep than the payments rows carry
       const vRepUid = v.rep ? repUid(v.rep) : null;
-      const paysRC = payments.filter(p =>
+      const paysAll = payments.filter(p =>
         (!v.rep || p.salesperson === v.rep || (vRepUid != null && p.user_id === vRepUid)) &&
         (!v.cust || String(p.partner_name || "").toLowerCase().includes(v.cust)));
-      // cash card: straight sum of dashboard_payments (excl. cancelled) —
-      // the same basis as the today's-cash KPI. Sub-line = payment count
-      // + received / in-transit split (owner request, replaced the
-      // collected÷invoiced ratio).
-      const monthPays = paysRC.filter(p => String(p.date).slice(0, 7) === thisMonth);
+      // MONEY basis: cancelled and REJECTED (bounced) payments are rows,
+      // not cash — every sum below uses paysRC; the status cards show
+      // the excluded states as their own rows, Odoo-style.
+      const isCash = p => p.state !== "canceled" && p.state !== "rejected";
+      const paysRC = paysAll.filter(isCash);
+      // cash card: sub-line = payment count + full status split
+      const monthAll = paysAll.filter(p => String(p.date).slice(0, 7) === thisMonth);
+      const monthPays = monthAll.filter(isCash);
       const cashMonth = monthPays.reduce((s, p) => s + num(p.amount), 0);
-      const mPaid = monthPays.filter(p => p.state === "paid").reduce((s, p) => s + num(p.amount), 0);
-      const mTransit = monthPays.filter(p => p.state === "in_process").reduce((s, p) => s + num(p.amount), 0);
+      const sumSt = (a, st) => a.filter(p => p.state === st).reduce((s, p) => s + num(p.amount), 0);
+      const mPaid = sumSt(monthAll, "paid"), mTransit = sumSt(monthAll, "in_process");
+      const mRej = sumSt(monthAll, "rejected"), mCanc = sumSt(monthAll, "canceled");
 
       // ----- TODAY strip (always today, respects rep/customer filter) -----
       const salesTodayRows = confAll.filter(o => dayOf(o) === today);
@@ -339,7 +343,8 @@
       document.getElementById("execHeads").innerHTML =
         card(D.t("ex_revenue"), revMonth != null ? D.fmtMoney(revMonth) : "—", momValid ? deltaTag(momRev) : "", "dashboard_invoices") + targetBlock + `</div>` +
         card(D.t("ex_cash"), D.fmtMoney(cashMonth), "", "dashboard_payments") +
-          `<div class="ex-sub" style="margin-top:9px">${D.fmtNum(monthPays.length)} ${D.t("payments_count")} · <span class="ok">✓ ${D.t("pay_paid")}: <b>${D.fmtMoney(mPaid)}</b></span> · ${D.t("pay_transit")}: <b>${D.fmtMoney(mTransit)}</b></div></div>`;
+          `<div class="ex-sub" style="margin-top:9px">${D.fmtNum(monthPays.length)} ${D.t("payments_count")} · <span class="ok">✓ ${D.t("pay_paid")}: <b>${D.fmtMoney(mPaid)}</b></span> · ${D.t("pay_transit")}: <b>${D.fmtMoney(mTransit)}</b></div>` +
+          `<div class="ex-sub"><span class="danger">${D.t("pay_rejected")}: <b>${D.fmtMoney(mRej)}</b></span> · <span style="opacity:.7">${D.t("pay_cancelled")}: <b>${D.fmtMoney(mCanc)}</b></span> <span style="opacity:.6">(${D.t("pay_excluded_note")})</span></div></div>`;
 
       // ----- minis (filter-range) -----
       // "Top governorate" only considers REAL governorates — a missing city in
@@ -379,7 +384,7 @@
       // each section individually guarded: one failure logs to the console
       // and leaves only its own panel empty, never a blank page
       sect("debtors", () => renderDebtors(byOver.slice(0, 10)));
-      sect("payments-today", () => renderPayToday(cashTodayRows));
+      sect("payments-today", () => renderPayToday(paysAll.filter(p => String(p.date).slice(0, 10) === today)));
       sect("payments-month-reps", () => renderPayMonthReps(paysRC));
       sect("chart-days", () => drawByDay(rangeRows));
       sect("chart-weeks", () => drawWeekly(confAll));
@@ -443,29 +448,35 @@
         <td class="amt"><span class="ok">${D.fmtMoney(r.paid)}</span></td>
       </tr>`).join("");
 
-    // today's payments: status split (paid / in transit) + per-rep table.
-    // Renders the status skeleton even with ZERO rows — an empty card told
-    // the reader nothing; zeros against the familiar categories do.
+    // today's payments: full Odoo-style status split (paid / in transit /
+    // rejected / cancelled — the same grouping as Odoo's payments screen)
+    // + per-rep table over the CASH rows only. Renders the skeleton even
+    // with ZERO rows — an empty card told the reader nothing.
     function renderPayToday(rows) {
       const box = document.getElementById("payTodayBox");
       const sum = a => a.reduce((s, p) => s + num(p.amount), 0);
-      const paid = rows.filter(p => p.state === "paid");
-      const pend = rows.filter(p => p.state === "in_process");
+      const by = st => rows.filter(p => p.state === st);
+      const cash = rows.filter(p => p.state === "paid" || p.state === "in_process");
       const statusRow = (label, a) => `<tr>
         <td class="strong">${label}</td>
         <td class="amt">${D.fmtNum(a.length)}</td>
         <td class="amt">${D.fmtMoney(sum(a))}</td>
       </tr>`;
-      const repRows = payRepRows(payRepAgg(rows));
+      const repRows = payRepRows(payRepAgg(cash));
       box.innerHTML = `
         <table class="dt">
           <thead><tr><th>${D.t("ack_status")}</th><th>${D.t("col_count")}</th><th>${D.t("col_amount")}</th></tr></thead>
           <tbody>
             ${statusRow("<b>" + D.t("pay_total") + "</b>", rows)}
-            ${statusRow(`<span class="ok">✓ ${D.t("pay_paid")}</span>`, paid)}
-            ${statusRow(D.t("pay_transit"), pend)}
+            ${statusRow(`<span class="ok">✓ ${D.t("pay_paid")}</span>`, by("paid"))}
+            ${statusRow(D.t("pay_transit"), by("in_process"))}
+            ${statusRow(`<span class="danger">${D.t("pay_rejected")}</span>`, by("rejected"))}
+            ${statusRow(`<span class="muted">${D.t("pay_cancelled")}</span>`, by("canceled"))}
           </tbody>
         </table>
+        <div class="muted" style="padding:9px 14px;font-size:12px">
+          <span class="ok">${D.fmtMoney(sum(cash))}</span> ${D.t("col_collected")} · ${D.t("pay_rejected")} + ${D.t("pay_cancelled")} ${D.t("pay_excluded_note")}
+        </div>
         <div class="panel-head" style="border-top:1px solid var(--bdr)"><h2>${D.t("pay_by_rep")}</h2></div>
         ${repRows ? `<table class="dt">
           ${payRepHead()}

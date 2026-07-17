@@ -132,8 +132,11 @@ governorate (`res.partner.state_id`) → customer master `city`
   zero amount** (voided receipts وصل ملغي/تالف — gives count parity with
   Odoo's day view); partner-less rows with real money are internal
   transfers between cash boxes and are dropped (not collections). Vendor
-  payments never fetched. Cancelled payments are stored but excluded at
-  load (`loadPayments`).
+  payments never fetched. **Cancelled AND rejected (bounced) payments are
+  stored but are never cash**: `loadPayments` excludes both by default;
+  the Overview loads all states (`all: true`) purely to show them as their
+  own status rows, Odoo-style (2026-07-16 — before this, `rejected` was
+  silently counted as collected).
 - **14-day collections grid** = `dashboard_payments` rows of the last 14
   Baghdad days; paid = state `paid`, pending = state `in_process`.
 - **Receivables age strip** = open-invoice residual AMOUNTS bucketed by
