@@ -68,9 +68,12 @@
       pay_today_tbl: "مدفوعات اليوم حسب الحالة",
       pay_by_rep: "مدفوعات اليوم حسب المندوب",
       pay_by_rep_month: "مدفوعات الشهر حسب المندوب",
-      pay_total: "الإجمالي (بدون الملغاة)",
+      pay_total: "الإجمالي",
       pay_paid: "مستلَم",
       pay_transit: "قيد التحويل",
+      pay_rejected: "مرفوضة",
+      pay_cancelled: "ملغاة",
+      pay_excluded_note: "غير محسوبة في المحصّل",
       col_collected: "المحصّل",
       due_7d: "يستحق خلال ٧ أيام",
       ov_vs_typical: "عن معدل نفس اليوم (٤ أسابيع)",
@@ -364,9 +367,12 @@
       pay_today_tbl: "Today's payments by status",
       pay_by_rep: "Today's payments by salesperson",
       pay_by_rep_month: "This month's payments by salesperson",
-      pay_total: "Total (excl. cancelled)",
+      pay_total: "Total",
       pay_paid: "Received",
       pay_transit: "In transit",
+      pay_rejected: "Rejected",
+      pay_cancelled: "Cancelled",
+      pay_excluded_note: "not counted as cash",
       col_collected: "Collected",
       due_7d: "Due within 7 days",
       ov_vs_typical: "vs 4-week same-weekday avg",
@@ -1589,9 +1595,12 @@
   async function loadPayments(o) {
     o = o || {};
     const sel = o.select || "payment_id,date,amount,state,salesperson,user_id,partner_name,partner_id,journal";
-    // Canceled payments are not money — excluding them here keeps every page's
-    // KPIs consistent with the rep_collections snapshot (which also skips them).
-    let q = `dashboard_payments?select=${sel}&order=date.desc&state=neq.canceled`;
+    // Canceled payments are not money, and neither are REJECTED (bounced)
+    // ones — excluding both keeps every page's cash KPIs honest. Pass
+    // all:true to also get canceled/rejected rows (the Overview shows them
+    // as their own status rows, Odoo-style, but never sums them as cash).
+    let q = `dashboard_payments?select=${sel}&order=date.desc`;
+    if (!o.all) q += `&state=not.in.(canceled,rejected)`;
     if (o.from) q += `&date=gte.${o.from}`;
     if (o.to)   q += `&date=lt.${nextDay(o.to)}`;
     const rows = dedupeBy(await sbGetAll(q), "payment_id");
