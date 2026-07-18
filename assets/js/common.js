@@ -1113,7 +1113,7 @@
 
     if (endpointKey === "alerts") {
       const since = new Date(Date.now() - 45 * 864e5).toISOString().slice(0, 10);
-      const sel = "order_id,order_name,partner_name,salesperson,city,amount_total,state,level,reasons,date_order,create_date";
+      const sel = "order_id,order_name,partner_name,salesperson,user_id,city,amount_total,state,level,reasons,date_order,create_date";
       const rows = await sbGet(
         `${CFG.TABLES.orders}?select=${sel}&level=in.(critical,warning)&create_date=gte.${since}` +
         `&order=date_order.desc,create_date.desc&limit=300`);
@@ -1130,7 +1130,7 @@
       return {
         found: true, currency: CFG.CURRENCY,
         order: {
-          id: o.order_id, name: o.order_name, partner_name: o.partner_name, salesperson: o.salesperson,
+          id: o.order_id, name: o.order_name, partner_name: o.partner_name, salesperson: o.salesperson, user_id: o.user_id,
           state: o.state, type_name: o.type_name, date_order: o.date_order, create_date: o.create_date,
           amount_total: o.amount_total,
           total_quantity: o.total_quantity, total_product: o.total_product,
@@ -1598,6 +1598,18 @@
     const rows = dedupeBy(await sbGetAll(q), "order_id");
     return rows.map(r => ({ ...r, amount_total: Number(r.amount_total) || 0 }));
   }
+  // The salespeople MASTER (synced from Odoo) — pages feed it into the rep
+  // dropdown so ALL reps are selectable, and resolve name→user_id for
+  // uid-aware filtering (the same rep is spelled differently across
+  // orders / invoices / payments). Cached per page load; never throws.
+  let _repMaster = null;
+  async function loadSalespeopleMaster() {
+    if (_repMaster) return _repMaster;
+    try { _repMaster = await sbGet("salespeople?select=user_id,name&order=name"); }
+    catch (e) { _repMaster = []; }
+    return _repMaster;
+  }
+
   async function loadPayments(o) {
     o = o || {};
     const sel = o.select || "payment_id,date,amount,state,salesperson,user_id,partner_name,partner_id,journal";
@@ -1631,7 +1643,7 @@
     fmtNum, fmtMoney, fmtMoneyFull, fmtDate, fmtTime,
     api, ackAlert, beep, toast, notify, buildChrome, setUpdated, renderSoundBtn,
     stateLabel, trustLabel, filterBar,
-    govOf, govLabel, GOV, loadOrders, loadPayments, sbGetAll, sbGet, sbWrite, nextDay, bagDay, addDays, weekStartSat,
+    govOf, govLabel, GOV, loadOrders, loadPayments, loadSalespeopleMaster, sbGetAll, sbGet, sbWrite, nextDay, bagDay, addDays, weekStartSat,
     DATA_SOURCES, loadHiddenSources, setHiddenSources, applyDataSourceVisibility, applyHidden,
     cfg: CFG
   };

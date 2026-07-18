@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Credit & Collections</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=53" />
+  <link rel="stylesheet" href="assets/css/style.css?v=54" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -45,10 +45,10 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=53"></script>
-  <script src="assets/js/auth.js?v=53"></script>
-  <script src="assets/js/common.js?v=53"></script>
-  <script src="assets/js/order-modal.js?v=53"></script>
+  <script src="assets/js/config.js?v=54"></script>
+  <script src="assets/js/auth.js?v=54"></script>
+  <script src="assets/js/common.js?v=54"></script>
+  <script src="assets/js/order-modal.js?v=54"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -77,7 +77,14 @@
       const kbox = document.getElementById("kpis");
       if (!rows.length) { kbox.innerHTML = ""; box.innerHTML = `<div class="empty">${D.t("no_data")}</div>`; fb.setCount(0); return; }
 
-      const f = rows.filter(r => fb.match(r, { rep: "salesperson", cust: "name" }));
+      const v = fb.values();
+      const uid = v.rep ? (() => {
+        const hit = masterReps.find(m => m.name === v.rep) || rows.find(r => r.salesperson === v.rep && r.user_id != null);
+        return hit ? (hit.user_id != null ? hit.user_id : null) : null;
+      })() : null;
+      const f = rows.filter(r =>
+        (!v.rep || r.salesperson === v.rep || (uid != null && r.user_id === uid)) &&
+        fb.match(r, { cust: "name" }));
       fb.setCount(f.length);
 
       const receivable = f.reduce((s, r) => s + r.receivable, 0);
@@ -153,17 +160,21 @@
       });
     }
 
+    let masterReps = [];
     async function tick() {
       let snap;
       try { snap = await D.api("rep_debt"); }
       catch (e) { document.getElementById("debtBox").innerHTML = `<div class="err">${D.t("error_load")}</div>`; return; }
       try { order = await D.api("collections"); } catch (e) { order = null; }
+      try { masterReps = await D.loadSalespeopleMaster(); } catch (e) { masterReps = masterReps || []; }
       D.setUpdated(snap.generated_at);
       rows = [];
       (snap.reps || []).forEach(r => (r.customers || []).forEach(c => {
-        rows.push({ name: c.name, city: c.city, receivable: c.receivable || 0, overdue: c.overdue || 0, salesperson: r.salesperson });
+        rows.push({ name: c.name, city: c.city, receivable: c.receivable || 0, overdue: c.overdue || 0,
+          salesperson: r.salesperson, user_id: r.user_id != null ? r.user_id : null });
       }));
-      fb.setReps((snap.reps || []).map(r => r.salesperson));
+      // master list + debt-snapshot spellings, matched by user_id first
+      fb.setReps([...masterReps.map(r => r.name), ...(snap.reps || []).map(r => r.salesperson)]);
       render();
     }
     tick();

@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-07-17 — Filters work on every page + invoices backfill (v54)
+
+- **Filter audit across all pages**, fixed:
+  - Salespeople page: the rep dropdown was NEVER populated (no `setReps`
+    call) and the customer search matched nothing (partner_name wasn't
+    selected). Both fixed; rep matching is uid-aware.
+  - Collections page: dropdown held payment spellings only, but the
+    filter also matches orders — cross-spelling reps broke the per-rep
+    "vs sales" columns. Now master list + uid-aware matching on both
+    payments and orders.
+  - Debt page: rows carry `user_id`; dropdown = master + snapshot
+    spellings; uid-aware matching.
+  - Alerts page: alerts endpoint now returns `user_id`; dropdown =
+    master + alert spellings; uid-aware matching.
+  - Overview: reloading the date window no longer shrinks the dropdown
+    back to order-spellings only.
+  - Shared `D.loadSalespeopleMaster()` (cached, never throws) feeds every
+    page's dropdown so ALL reps are always selectable.
+- **n8n: "Dabboos Invoices BACKFILL 2026 — run once"** standalone
+  workflow, like the payments one: receivable lines dated 2026-01-01+
+  PLUS all still-open lines of any date (pre-2026 open receivables are
+  real debt), deduped, chunked upserts on invoice_id.
+- Cache-bust v=54.
+
 ## 2026-07-16 — Fix: pagination lost rows on non-unique sort (v53)
 
 - **Root cause of "dashboard shows fewer rows than the DB"** (owner found

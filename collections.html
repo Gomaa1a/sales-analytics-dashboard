@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Daily Collections</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=53" />
+  <link rel="stylesheet" href="assets/css/style.css?v=54" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -37,9 +37,9 @@
     <div class="foot">Dabboos Sales Command Center · Odoo → n8n → Supabase</div>
   </main>
 
-  <script src="assets/js/config.js?v=53"></script>
-  <script src="assets/js/auth.js?v=53"></script>
-  <script src="assets/js/common.js?v=53"></script>
+  <script src="assets/js/config.js?v=54"></script>
+  <script src="assets/js/auth.js?v=54"></script>
+  <script src="assets/js/common.js?v=54"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -84,11 +84,13 @@
       render();
     }
 
+    let masterReps = [];
     async function loadWindow(from, to) {
       try {
-        [payments, orders] = await Promise.all([
+        [payments, orders, masterReps] = await Promise.all([
           D.loadPayments({ from, to }),
-          D.loadOrders({ from, to, dateField: "date_order", select: "order_id,salesperson,user_id,state,amount_total,create_date,date_order,partner_name" })
+          D.loadOrders({ from, to, dateField: "date_order", select: "order_id,salesperson,user_id,state,amount_total,create_date,date_order,partner_name" }),
+          D.loadSalespeopleMaster()
         ]);
         loadedFrom = from; loadedTo = to;
         D.setUpdated(new Date().toISOString());
@@ -97,13 +99,23 @@
 
     const isConf = o => o.state === "sale" || o.state === "done";
     const repKey = r => String(r.user_id != null ? r.user_id : (r.salesperson || "—"));
+    // name → user id (payments and orders can spell the same rep differently)
+    const repUid = name => {
+      const hit = masterReps.find(r => r.name === name) ||
+        payments.find(p => p.salesperson === name && p.user_id != null) ||
+        orders.find(o => o.salesperson === name && o.user_id != null);
+      return hit ? (hit.user_id != null ? hit.user_id : null) : null;
+    };
 
     function render() {
       const v = fb.values();
       const from = v.from || monthStart, to = v.to || today;
-      // rep + customer narrowing
-      const pays = payments.filter(p => fb.match(p, { rep: "salesperson", cust: "partner_name" }));
-      const ords = orders.filter(o => isConf(o) && fb.match(o, { rep: "salesperson", cust: "partner_name" }));
+      // rep + customer narrowing — rep matches by user_id first so the same
+      // rep is caught in BOTH payments and orders whatever the spelling
+      const uid = v.rep ? repUid(v.rep) : null;
+      const repOk = r => !v.rep || r.salesperson === v.rep || (uid != null && r.user_id === uid);
+      const pays = payments.filter(p => repOk(p) && fb.match(p, { cust: "partner_name" }));
+      const ords = orders.filter(o => isConf(o) && repOk(o) && fb.match(o, { cust: "partner_name" }));
       fb.setCount(pays.length);
 
       // ---- KPI cards ----
@@ -194,7 +206,8 @@
       try { grid = await D.api("rep_collections"); } catch (e) { grid = null; }
       await loadWindow(lastMonthStart, today);
       // populate rep dropdown from loaded payments
-      fb.setReps([...new Set(payments.map(p => p.salesperson).filter(Boolean))]);
+      fb.setReps([...masterReps.map(r => r.name),
+        ...payments.map(p => p.salesperson), ...orders.map(o => o.salesperson)]);
       render();
     }
     init();

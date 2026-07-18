@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Sales Command Center</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=53" />
+  <link rel="stylesheet" href="assets/css/style.css?v=54" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -84,9 +84,9 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=53"></script>
-  <script src="assets/js/auth.js?v=53"></script>
-  <script src="assets/js/common.js?v=53"></script>
+  <script src="assets/js/config.js?v=54"></script>
+  <script src="assets/js/auth.js?v=54"></script>
+  <script src="assets/js/common.js?v=54"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -190,7 +190,10 @@
           D.loadPayments({ from, to, all: true }) // all states: the status cards show rejected/cancelled rows (never as cash)
         ]);
         loadedFrom = from; loadedTo = to;
-        fb.setReps(allRows.map(o => o.salesperson));
+        // keep the master list in the dropdown — a window reload must not
+        // shrink it back to only the reps seen in the loaded orders
+        fb.setReps([...masterReps.map(r => r.name), ...allRows.map(o => o.salesperson),
+          ...payments.map(p => p.salesperson)]);
         D.setUpdated(new Date().toISOString());
       } catch (e) { allRows = []; payments = []; document.getElementById("execHeads").innerHTML = `<div class="err">${D.t("error_load")}</div>`; }
     }
@@ -209,8 +212,7 @@
       try { invMonth = await D.api("invoices_month"); } catch (e) { invMonth = null; }
       // the salespeople MASTER (synced from Odoo) — so the dropdown holds
       // ALL reps, not only the ones with activity in the loaded window
-      try { masterReps = await D.sbGet("salespeople?select=user_id,name&order=name"); }
-      catch (e) { masterReps = masterReps || []; }
+      masterReps = await D.loadSalespeopleMaster();
       // rep dropdown: master + every spelling seen in orders/invoices/payments
       fb.setReps([
         ...masterReps.map(r => r.name),
