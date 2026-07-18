@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Sales Command Center</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=56" />
+  <link rel="stylesheet" href="assets/css/style.css?v=57" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -62,6 +62,10 @@
 
     <!-- Row 4 — RHYTHM: daily pulse + weekly trajectory -->
     <h2 class="sect-h" id="secRhythm"></h2>
+    <div class="panel" style="margin-bottom:16px" data-src="dashboard_orders">
+      <div class="panel-head"><h2 id="ordDayTitle"></h2></div>
+      <div class="panel-body cap" style="padding:0"><div id="ordDayBox"></div></div>
+    </div>
     <div class="grid-2">
       <div class="panel" data-src="dashboard_orders">
         <div class="panel-head"><h2 id="dayTitle"></h2></div>
@@ -84,9 +88,9 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=56"></script>
-  <script src="assets/js/auth.js?v=56"></script>
-  <script src="assets/js/common.js?v=56"></script>
+  <script src="assets/js/config.js?v=57"></script>
+  <script src="assets/js/auth.js?v=57"></script>
+  <script src="assets/js/common.js?v=57"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -106,6 +110,7 @@
     document.getElementById("secWho").textContent = D.t("sec_who");
     document.getElementById("invTodayTitle").textContent = D.t("inv_today_tbl");
     document.getElementById("invMonthRepTitle").textContent = D.t("inv_by_rep_month");
+    document.getElementById("ordDayTitle").textContent = D.t("ord_by_day");
 
     // the invoice/payment cards are tall — let the user collapse them.
     // Click the panel head to toggle; the choice persists per panel.
@@ -125,7 +130,7 @@
       set(stored == null ? !!defaultCollapsed : stored === "1");
       head.addEventListener("click", () => set(body.style.display !== "none"));
     }
-    ["invTodayTitle", "payTodayTitle"].forEach(id => collapsible(id, false));
+    ["invTodayTitle", "payTodayTitle", "ordDayTitle"].forEach(id => collapsible(id, false));
     ["invMonthRepTitle", "payMonthRepTitle"].forEach(id => collapsible(id, true));
 
     const isConf = o => o.state === "sale" || o.state === "done";
@@ -402,6 +407,7 @@
       sect("debtors", () => renderDebtors(byOver.slice(0, 10)));
       sect("payments-today", () => renderPayToday(paysAll.filter(p => String(p.date).slice(0, 10) === today)));
       sect("payments-month-reps", () => renderPayMonthReps(paysRC));
+      sect("orders-by-day", () => renderOrdersByDay(rangeRows));
       sect("chart-days", () => drawByDay(rangeRows));
       sect("chart-weeks", () => drawWeekly(confAll));
       sect("chart-customers", () => drawTopCustomers(rConf));
@@ -570,6 +576,54 @@
     // INVOICE-LEVEL rows client-side so BOTH filters apply: salesperson
     // (uid-aware — spellings differ between tables) and customer name.
     // Names are DB strings — they go through D.esc.
+    // Orders by day — the numeric twin of Odoo's Orders list grouped by
+    // "Order Date: Day > Status". Rows = the filter-range slice (date +
+    // rep + customer already applied); money = ALL statuses, like Odoo's
+    // Total column, so the two screens are comparable line by line.
+    function renderOrdersByDay(rows) {
+      const box = document.getElementById("ordDayBox");
+      if (!rows.length) { box.innerHTML = `<div class="empty">${D.t("no_data")}</div>`; return; }
+      const m = new Map();
+      rows.forEach(o => {
+        const d = dayOf(o); if (!d) return;
+        if (!m.has(d)) m.set(d, { total: 0, conf: 0, cancel: 0, draft: 0, money: 0 });
+        const e = m.get(d);
+        e.total++; e.money += val(o);
+        if (isConf(o)) e.conf++;
+        else if (o.state === "cancel") e.cancel++;
+        else e.draft++;
+      });
+      const days = [...m.entries()].sort((a, b) => b[0] < a[0] ? -1 : 1);
+      const sumF = f => days.reduce((s, [, e]) => s + e[f], 0);
+      box.innerHTML = `
+        <table class="dt">
+          <thead><tr>
+            <th>${D.t("col_day")}</th><th>${D.t("col_count")}</th>
+            <th>${D.t("ov_confirmed_short")}</th><th>${D.t("ov_quotes")}</th>
+            <th>${D.t("st_cancelled_inv")}</th><th>${D.t("col_amount")}</th>
+          </tr></thead>
+          <tbody>
+          ${days.map(([d, e]) => `<tr>
+            <td class="strong">${d}</td>
+            <td class="amt">${D.fmtNum(e.total)}</td>
+            <td class="amt"><span class="ok">${D.fmtNum(e.conf)}</span></td>
+            <td class="amt">${e.draft ? D.fmtNum(e.draft) : `<span class="muted">0</span>`}</td>
+            <td class="amt">${e.cancel ? `<span class="danger">${D.fmtNum(e.cancel)}</span>` : `<span class="muted">0</span>`}</td>
+            <td class="amt"><b>${D.fmtMoney(e.money)}</b></td>
+          </tr>`).join("")}
+          </tbody>
+          <tfoot><tr>
+            <td><b>${D.t("coll_grand_total")}</b></td>
+            <td class="amt"><b>${D.fmtNum(sumF("total"))}</b></td>
+            <td class="amt"><b>${D.fmtNum(sumF("conf"))}</b></td>
+            <td class="amt">${D.fmtNum(sumF("draft"))}</td>
+            <td class="amt">${D.fmtNum(sumF("cancel"))}</td>
+            <td class="amt"><b>${D.fmtMoney(sumF("money"))}</b></td>
+          </tr></tfoot>
+        </table>
+        <div class="muted" style="padding:9px 14px;font-size:11.5px">🔍 ${D.t("chk_orders")}</div>`;
+    }
+
     // today's invoice stats over the FILTERED rows — same buckets as the
     // builder, recomputed client-side so filters narrow the whole card.
     // Falls back to the builder's global buckets if posted_rows is absent

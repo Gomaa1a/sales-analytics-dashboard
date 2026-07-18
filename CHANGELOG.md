@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-07-18 — "Orders by day" table, the numeric twin of Odoo's list (v57)
+
+- New collapsible panel at the top of the Rhythm section: **Orders by
+  day** — day × total · confirmed · drafts · cancelled · money — exactly
+  the grouping of Odoo's Orders list ("Order Date: Day > Status"); money
+  sums ALL statuses like Odoo's Total column. Honors every filter
+  (date range, rep, customer); grand-total footer; 🔍 verify hint.
+- Buckets by `date_order` on the Baghdad calendar via the page's shared
+  `dayOf()` — the same basis as the daily chart, so chart and table can
+  never disagree.
+- Cache-bust v=57.
+
 ## 2026-07-17 — Filters now reach EVERYTHING (v56)
 
 - Audit: some Overview blocks came from global builders and ignored the
