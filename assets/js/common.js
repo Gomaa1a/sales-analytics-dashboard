@@ -81,6 +81,7 @@
       chk_aged: "للمطابقة مع أودو: المحاسبة ← التقارير ← أعمار الذمم — «المتأخر» = مجموع أعمدة التأخير (1-30…الأقدم)، «غير مستحق بعد» = عمود At Date، «إجمالي الذمة» = عمود الإجمالي.",
       chk_inv_today: "للمطابقة مع أودو: المحاسبة ← فواتير العملاء — تصفية «تاريخ الفاتورة = اليوم» والتجميع حسب حالة الدفع.",
       chk_pay: "للمطابقة مع أودو: المحاسبة ← مدفوعات العملاء — التجميع حسب الحالة (المبالغ بإشارتها: الاسترجاع بالسالب).",
+      refresh_btn: "تحديث كل الأرقام من قاعدة البيانات",
       ord_by_day: "الطلبات حسب اليوم",
       col_day: "اليوم",
       chk_orders: "للمطابقة مع أودو: المبيعات ← الطلبات — التجميع حسب «تاريخ الطلب: يوم» ثم الحالة (القيمة = مجموع كل الحالات كما في عمود الإجمالي).",
@@ -392,6 +393,7 @@
       chk_aged: "Verify in Odoo: Accounting → Reporting → Aged Receivable — Overdue = the late columns (1-30…Older), Not due yet = the At Date column, Total open = the Total column.",
       chk_inv_today: "Verify in Odoo: Accounting → Customer Invoices — filter Invoice Date = today, group by Payment Status.",
       chk_pay: "Verify in Odoo: Accounting → Customer Payments — group by Status (signed amounts: refunds negative).",
+      refresh_btn: "Refresh all numbers from the database",
       ord_by_day: "Orders by day",
       col_day: "Day",
       chk_orders: "Verify in Odoo: Sales → Orders — group by Order Date: Day, then Status (money = all statuses, like Odoo's Total column).",
@@ -1290,6 +1292,7 @@
         </nav>
         <div class="hd-tools">
           <span class="live-dot"><i></i>${t("live")}</span>
+          <button id="refreshBtn" class="icon-btn" type="button" title="${t("refresh_btn")}">🔄</button>
           <button id="soundBtn" class="icon-btn" type="button"></button>
           <button id="pdfBtn" class="icon-btn" type="button" title="${t("export_pdf")}">🖨️</button>
           <button id="langBtn" class="icon-btn lang" type="button">${t("lang_btn")}</button>
@@ -1302,6 +1305,9 @@
         localStorage.setItem("dash_lang", LANG);
         location.reload();
       });
+      // full refresh: reloading the page drops every in-memory cache (the
+      // 4-min adapter cache included) and refetches ALL numbers from the DB
+      document.getElementById("refreshBtn").addEventListener("click", () => location.reload());
       document.getElementById("soundBtn").addEventListener("click", toggleSound);
       // Export PDF = browser print dialog → "Save as PDF" (print stylesheet cleans the page)
       document.getElementById("pdfBtn").addEventListener("click", () => window.print());
