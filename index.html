@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Sales Command Center</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=54" />
+  <link rel="stylesheet" href="assets/css/style.css?v=55" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -84,9 +84,9 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=54"></script>
-  <script src="assets/js/auth.js?v=54"></script>
-  <script src="assets/js/common.js?v=54"></script>
+  <script src="assets/js/config.js?v=55"></script>
+  <script src="assets/js/auth.js?v=55"></script>
+  <script src="assets/js/common.js?v=55"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -411,21 +411,27 @@
       // per-customer DSO comes from the collections snapshot (top overdue only)
       const dsoMap = {};
       ((collSnap && collSnap.overdue_customers) || []).forEach(c => { if (c.dso > 0) dsoMap[c.name] = Math.round(c.dso); });
+      // columns speak Odoo's Aged-Receivable vocabulary so viewers can map
+      // them 1:1: Overdue = the late columns · Not due yet = "At Date" ·
+      // Total open = the Total column. The footer names that exact screen.
       box.innerHTML = `
         <table class="dt">
-          <thead><tr><th>${D.t("col_customer")}</th><th>${D.t("col_rep")}</th><th>${D.t("col_overdue")}</th><th>${D.t("col_debit")}</th><th>${D.t("od_days")}</th></tr></thead>
+          <thead><tr><th>${D.t("col_customer")}</th><th>${D.t("col_rep")}</th><th>${D.t("col_overdue")}</th><th>${D.t("col_notdue")}</th><th>${D.t("col_total_open")}</th><th>${D.t("od_days")}</th></tr></thead>
           <tbody>
           ${top.map(r => {
             const dso = dsoMap[r.name];
+            const notDue = r.receivable - r.overdue;
             return `<tr>
             <td class="strong">${D.esc(r.name)}</td>
             <td class="muted">${D.esc(r.salesperson)}</td>
             <td class="amt"><span class="danger">${D.fmtMoney(r.overdue)}</span></td>
-            <td class="amt muted">${D.fmtMoney(r.receivable)}</td>
+            <td class="amt muted">${notDue > 0 ? D.fmtMoney(notDue) : "0"}</td>
+            <td class="amt"><b>${D.fmtMoney(r.receivable)}</b></td>
             <td class="amt">${dso != null ? `<span class="${dso > 60 ? "danger" : ""}">${D.fmtNum(dso)}</span>` : "—"}</td>
           </tr>`; }).join("")}
           </tbody>
-        </table>`;
+        </table>
+        <div class="muted" style="padding:9px 14px;font-size:11.5px">🔍 ${D.t("chk_aged")}</div>`;
     }
 
     /* ---- payments panels: the twin of the invoice cards, on the payment
@@ -483,6 +489,7 @@
         <div class="muted" style="padding:9px 14px;font-size:12px">
           <span class="ok">${D.fmtMoney(sum(cash))}</span> ${D.t("col_collected")} · ${D.t("pay_rejected")} + ${D.t("pay_cancelled")} ${D.t("pay_excluded_note")}
         </div>
+        <div class="muted" style="padding:0 14px 9px;font-size:11.5px">🔍 ${D.t("chk_pay")}</div>
         <div class="panel-head" style="border-top:1px solid var(--bdr)"><h2>${D.t("pay_by_rep")}</h2></div>
         ${repRows ? `<table class="dt">
           ${payRepHead()}
@@ -504,6 +511,7 @@
         <div class="muted" style="padding:9px 14px;font-size:12px">
           ${thisMonth} · ${D.fmtNum(rows.length)} ${D.t("payments_count")} ·
           <span class="ok">${D.fmtMoney(total)}</span>
+          <br>🔍 ${D.t("chk_pay_month")}
         </div>`;
     }
 
@@ -536,6 +544,7 @@
           <span class="ok">${D.fmtMoney(num(t.collected_today))}</span> ${D.t("collected_same_day")}
           ${gap > 0 ? ` · ${D.fmtMoney(gap)} ${D.t("inv_gap_note")}` : ""}
         </div>
+        <div class="muted" style="padding:0 14px 9px;font-size:11.5px">🔍 ${D.t("chk_inv_today")}</div>
         ${repRows ? `
         <div class="panel-head" style="border-top:1px solid var(--bdr)"><h2>${D.t("inv_by_rep")}</h2></div>
         <table class="dt">
@@ -590,6 +599,7 @@
         <div class="muted" style="padding:9px 14px;font-size:12px">
           ${invMonth.month} · ${D.fmtNum(invMonth.count)} ${D.t("invoices_w")} ·
           <span class="ok">${D.fmtMoney(num(invMonth.collected))}</span> ${D.t("collected_so_far")}
+          <br>🔍 ${D.t("chk_inv_month")}
         </div>`;
     }
 

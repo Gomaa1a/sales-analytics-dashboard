@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-07-17 — Speak Odoo's language: verify-in-Odoo hints everywhere (v55)
+
+- Design rule adopted: viewers ALWAYS compare the dashboard with Odoo, so
+  cards use Odoo's own vocabulary and name the exact screen that
+  reproduces them.
+- **Top overdue customers** re-presented with Aged-Receivable columns:
+  Overdue (the late columns) · **Not due yet** (At Date) · **Total open**
+  (the Total column, bold) · days late — plus a 🔍 footer naming the
+  report. "Receivable" (ambiguous) is gone.
+- 🔍 verify-hints added: invoices-today card (Customer Invoices grouped by
+  payment status), payments-today card (Customer Payments grouped by
+  status, signed amounts), month invoice/payment rep cards (grouped by
+  salesperson), Debt page header (Aged Receivable column mapping), and
+  the Collections page subtitle.
+- Debt table column "الدين" renamed to "إجمالي الذمة" (= Odoo's Total).
+- n8n (earlier today, no assets): orders incremental "Fetch Missing
+  Customers" collapsed from one-request-per-customer to a single in-list
+  request — the cold-cache crawl is gone.
+- Cache-bust v=55.
+
 ## 2026-07-17 — Filters work on every page + invoices backfill (v54)
 
 - **Filter audit across all pages**, fixed:
