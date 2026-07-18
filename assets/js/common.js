@@ -1016,11 +1016,17 @@
     const out = { posted: bucket(), paid: bucket(), partial: bucket(), unpaid: bucket(), cancelled: bucket() };
     const reps = new Map();
     const postedRows = []; // invoice-level rows so pages can filter by rep AND customer
+    const cancelledRows = []; // same, for the cancelled status row
     let collected = 0;
     for (const x of rows) {
       const t = num2(x.amount_total), res = num2(x.amount_residual);
       const add = b => { b.n++; b.value += t; b.residual += res; };
-      if (x.state === "cancel") { add(out.cancelled); continue; }
+      if (x.state === "cancel") {
+        add(out.cancelled);
+        cancelledRows.push({ user_id: x.user_id != null ? x.user_id : null,
+          salesperson: repName(x), partner_name: x.partner_name || "", value: t, residual: res });
+        continue;
+      }
       if (x.state !== "posted") continue; // drafts don't count anywhere
       add(out.posted);
       collected += t - res;
@@ -1042,7 +1048,7 @@
     return { generated_at: new Date().toISOString(), currency: CFG.CURRENCY, today,
       posted: out.posted, paid: out.paid, partial: out.partial,
       unpaid: out.unpaid, cancelled: out.cancelled, collected_today: collected,
-      posted_rows: postedRows,
+      posted_rows: postedRows, cancelled_rows: cancelledRows,
       by_rep: [...reps.values()].sort((a, b) => b.value - a.value) };
   }
 

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Daily Collections</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=55" />
+  <link rel="stylesheet" href="assets/css/style.css?v=56" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -37,9 +37,9 @@
     <div class="foot">Dabboos Sales Command Center · Odoo → n8n → Supabase</div>
   </main>
 
-  <script src="assets/js/config.js?v=55"></script>
-  <script src="assets/js/auth.js?v=55"></script>
-  <script src="assets/js/common.js?v=55"></script>
+  <script src="assets/js/config.js?v=56"></script>
+  <script src="assets/js/auth.js?v=56"></script>
+  <script src="assets/js/common.js?v=56"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -177,9 +177,17 @@
       if (!grid || !grid.reps) { box.innerHTML = `<div class="empty">${D.t("no_data")}</div>`; return; }
       const v = fb.values();
       const days = grid.days || [];
-      const reps = grid.reps.filter(r => !v.rep || r.salesperson === v.rep);
-      const tbd = grid.totals_by_day || {};
+      // uid-aware rep match (snapshot spellings can differ from the dropdown)
+      const guid = v.rep ? repUid(v.rep) : null;
+      const reps = grid.reps.filter(r => !v.rep || r.salesperson === v.rep || (guid != null && r.user_id === guid));
       if (!reps.length) { box.innerHTML = `<div class="empty">${D.t("no_data")}</div>`; return; }
+      // footer: global totals normally; the FILTERED reps' totals when a rep
+      // is selected (a global footer under one rep's row misled readers)
+      const tbdAll = grid.totals_by_day || {};
+      const tbd = d => v.rep
+        ? reps.reduce((s, r) => s + ((((r.daily || {})[d]) || {}).total || 0), 0)
+        : ((tbdAll[d] && tbdAll[d].total) || 0);
+      const grand = v.rep ? reps.reduce((s, r) => s + (r.total || 0), 0) : grid.grand_total;
       box.innerHTML = `
         <table class="dt coll-grid">
           <thead><tr>
@@ -196,8 +204,8 @@
           </tbody>
           <tfoot><tr>
             <td>${D.t("coll_grand_total")}</td>
-            ${days.map(d => `<td class="cell${d === grid.today ? " today" : ""}">${(tbd[d] && tbd[d].total) ? D.fmtMoney(tbd[d].total) : "—"}</td>`).join("")}
-            <td class="cell">${D.fmtMoney(grid.grand_total)}</td>
+            ${days.map(d => `<td class="cell${d === grid.today ? " today" : ""}">${tbd(d) ? D.fmtMoney(tbd(d)) : "—"}</td>`).join("")}
+            <td class="cell">${D.fmtMoney(grand)}</td>
           </tr></tfoot>
         </table>`;
     }

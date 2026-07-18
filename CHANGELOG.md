@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-07-17 — Filters now reach EVERYTHING (v56)
+
+- Audit: some Overview blocks came from global builders and ignored the
+  rep/customer filter. All fixed — the filter now narrows:
+  - the **"Invoiced today" KPI** and the WHOLE invoices-today card
+    (status buckets, collected footer, cancelled row — recomputed
+    client-side from invoice-level rows; builder now also returns
+    `cancelled_rows`),
+  - the **month revenue card** (value/count/collected recomputed from
+    `posted_rows`; MoM% and the target bar hide while filtered — they
+    are company-wide comparisons and would mislead against a slice),
+  - the **top-debtors card** (uid-aware rep matching; rows carry
+    `user_id`),
+  - the **collections 14-day grid** (uid-aware rep match, and the footer
+    totals switch to the FILTERED reps' totals instead of the global
+    grand total).
+- Already filtered and verified: payments cards, per-rep tables, minis,
+  charts, debt page, alerts, salespeople.
+- Cache-bust v=56.
+
 ## 2026-07-17 — Speak Odoo's language: verify-in-Odoo hints everywhere (v55)
 
 - Design rule adopted: viewers ALWAYS compare the dashboard with Odoo, so
