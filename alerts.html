@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Alert Center</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=53" />
+  <link rel="stylesheet" href="assets/css/style.css?v=54" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -41,10 +41,10 @@
     <div class="foot">Dabboos Sales Command Center · n8n + Odoo</div>
   </main>
 
-  <script src="assets/js/config.js?v=53"></script>
-  <script src="assets/js/auth.js?v=53"></script>
-  <script src="assets/js/common.js?v=53"></script>
-  <script src="assets/js/order-modal.js?v=53"></script>
+  <script src="assets/js/config.js?v=54"></script>
+  <script src="assets/js/auth.js?v=54"></script>
+  <script src="assets/js/common.js?v=54"></script>
+  <script src="assets/js/order-modal.js?v=54"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -55,6 +55,7 @@
     document.getElementById("notesTitle").textContent = D.t("ack_notes");
 
     let all = [], ackMap = {}, acksAll = [];
+    let masterReps = [];
     let sev = "all", stat = "all";
     const seen = new Set(JSON.parse(localStorage.getItem("seen_alerts") || "[]"));
     let firstLoad = true;
@@ -86,9 +87,15 @@
 
     function render() {
       // base respects the filter bar (date/rep/customer) + severity pill → KPIs & notes follow this
+      const v = fb.values();
+      const uid = v.rep ? (() => {
+        const hit = masterReps.find(m => m.name === v.rep) || all.find(r => r.salesperson === v.rep && r.user_id != null);
+        return hit ? (hit.user_id != null ? hit.user_id : null) : null;
+      })() : null;
       const base = all.filter(r =>
         (sev === "all" || r.level === sev) &&
-        fb.match(r, { date: "date_order", rep: "salesperson", cust: "partner_name" }));
+        (!v.rep || r.salesperson === v.rep || (uid != null && r.user_id === uid)) &&
+        fb.match(r, { date: "date_order", cust: "partner_name" }));
 
       // KPIs
       const total = base.length;
@@ -161,13 +168,14 @@
 
     async function tick() {
       try {
-        const [a, ak] = await Promise.all([D.api("alerts"), D.api("acks")]);
+        const [a, ak, mr] = await Promise.all([D.api("alerts"), D.api("acks"), D.loadSalespeopleMaster()]);
+        masterReps = mr || [];
         D.setUpdated(a.generated_at);
         all = a.alerts || [];
         acksAll = ak.acks || [];
         ackMap = {};
         acksAll.forEach(r => { (ackMap[r.order_id] = ackMap[r.order_id] || []).push(r); });
-        fb.setReps(all.map(r => r.salesperson));
+        fb.setReps([...masterReps.map(r => r.name), ...all.map(r => r.salesperson)]);
         render();
         const fresh = a.alerts.filter(r => !seen.has(r.order_id) && (r.level === "critical" || (D.cfg.SOUND_ON_WARNING && r.level === "warning")));
         a.alerts.forEach(r => seen.add(r.order_id));

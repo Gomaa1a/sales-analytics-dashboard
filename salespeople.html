@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Salespeople</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=53" />
+  <link rel="stylesheet" href="assets/css/style.css?v=54" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -34,9 +34,9 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=53"></script>
-  <script src="assets/js/auth.js?v=53"></script>
-  <script src="assets/js/common.js?v=53"></script>
+  <script src="assets/js/config.js?v=54"></script>
+  <script src="assets/js/auth.js?v=54"></script>
+  <script src="assets/js/common.js?v=54"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -52,6 +52,13 @@
 
     let cmpChart = null; const sparks = {};
     let allRows = [], loadedFrom = null, loadedTo = null;
+    let masterReps = [];
+    // name → user id across spellings (master first, then loaded orders)
+    const repUid = name => {
+      const hit = masterReps.find(r => r.name === name) ||
+        allRows.find(o => o.salesperson === name && o.user_id != null);
+      return hit ? (hit.user_id != null ? hit.user_id : null) : null;
+    };
 
     // Baghdad calendar anchors
     const bag = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Baghdad" }));
@@ -87,9 +94,15 @@
 
     async function loadWindow(from, to) {
       try {
-        allRows = await D.loadOrders({ from, to, dateField: "date_order",
-          select: "order_id,salesperson,user_id,state,amount_total,create_date,date_order" });
+        [allRows, masterReps] = await Promise.all([
+          D.loadOrders({ from, to, dateField: "date_order",
+            select: "order_id,salesperson,user_id,partner_name,state,amount_total,create_date,date_order" }),
+          D.loadSalespeopleMaster()
+        ]);
         loadedFrom = from; loadedTo = to;
+        // this dropdown was never populated before v54 — feed it the master
+        // list plus every spelling seen in the loaded orders
+        fb.setReps([...masterReps.map(r => r.name), ...allRows.map(o => o.salesperson)]);
         D.setUpdated(new Date().toISOString());
       } catch (e) { allRows = []; document.getElementById("repCards").innerHTML = `<div class="err">${D.t("error_load")}</div>`; }
     }
@@ -97,7 +110,10 @@
     function compute() {
       const v = fb.values();
       const from = v.from || monthStart, to = v.to || today;
-      const conf = allRows.filter(o => isConf(o) && fb.match(o, { rep: "salesperson", cust: "partner_name" }));
+      const uid = v.rep ? repUid(v.rep) : null;
+      const conf = allRows.filter(o => isConf(o) &&
+        (!v.rep || o.salesperson === v.rep || (uid != null && o.user_id === uid)) &&
+        fb.match(o, { cust: "partner_name" }));
       const reps = {};
       const key = o => String(o.user_id != null ? o.user_id : (o.salesperson || "—"));
       conf.forEach(o => {
