@@ -76,6 +76,13 @@
       pay_excluded_note: "غير محسوبة في المحصّل",
       pay_cash_basis: "المحصّل = مستلَم + قيد التحويل",
       pay_grand_total: "الإجمالي شاملاً المرفوضة والملغاة",
+      col_notdue: "غير مستحق بعد",
+      col_total_open: "إجمالي الذمة",
+      chk_aged: "للمطابقة مع أودو: المحاسبة ← التقارير ← أعمار الذمم — «المتأخر» = مجموع أعمدة التأخير (1-30…الأقدم)، «غير مستحق بعد» = عمود At Date، «إجمالي الذمة» = عمود الإجمالي.",
+      chk_inv_today: "للمطابقة مع أودو: المحاسبة ← فواتير العملاء — تصفية «تاريخ الفاتورة = اليوم» والتجميع حسب حالة الدفع.",
+      chk_pay: "للمطابقة مع أودو: المحاسبة ← مدفوعات العملاء — التجميع حسب الحالة (المبالغ بإشارتها: الاسترجاع بالسالب).",
+      chk_inv_month: "للمطابقة مع أودو: المحاسبة ← فواتير العملاء — تصفية «تاريخ الفاتورة = هذا الشهر» (مرحّلة فقط) والتجميع حسب المندوب.",
+      chk_pay_month: "للمطابقة مع أودو: المحاسبة ← مدفوعات العملاء — تصفية «تاريخ الدفع = هذا الشهر» والتجميع حسب المندوب.",
       col_collected: "المحصّل",
       due_7d: "يستحق خلال ٧ أيام",
       ov_vs_typical: "عن معدل نفس اليوم (٤ أسابيع)",
@@ -377,6 +384,13 @@
       pay_excluded_note: "not counted as cash",
       pay_cash_basis: "Collected = received + in transit",
       pay_grand_total: "Total incl. rejected & cancelled",
+      col_notdue: "Not due yet",
+      col_total_open: "Total open",
+      chk_aged: "Verify in Odoo: Accounting → Reporting → Aged Receivable — Overdue = the late columns (1-30…Older), Not due yet = the At Date column, Total open = the Total column.",
+      chk_inv_today: "Verify in Odoo: Accounting → Customer Invoices — filter Invoice Date = today, group by Payment Status.",
+      chk_pay: "Verify in Odoo: Accounting → Customer Payments — group by Status (signed amounts: refunds negative).",
+      chk_inv_month: "Verify in Odoo: Accounting → Customer Invoices — filter Invoice Date = this month (posted only), group by Salesperson.",
+      chk_pay_month: "Verify in Odoo: Accounting → Customer Payments — filter Payment Date = this month, group by Salesperson.",
       col_collected: "Collected",
       due_7d: "Due within 7 days",
       ov_vs_typical: "vs 4-week same-weekday avg",
@@ -1002,11 +1016,17 @@
     const out = { posted: bucket(), paid: bucket(), partial: bucket(), unpaid: bucket(), cancelled: bucket() };
     const reps = new Map();
     const postedRows = []; // invoice-level rows so pages can filter by rep AND customer
+    const cancelledRows = []; // same, for the cancelled status row
     let collected = 0;
     for (const x of rows) {
       const t = num2(x.amount_total), res = num2(x.amount_residual);
       const add = b => { b.n++; b.value += t; b.residual += res; };
-      if (x.state === "cancel") { add(out.cancelled); continue; }
+      if (x.state === "cancel") {
+        add(out.cancelled);
+        cancelledRows.push({ user_id: x.user_id != null ? x.user_id : null,
+          salesperson: repName(x), partner_name: x.partner_name || "", value: t, residual: res });
+        continue;
+      }
       if (x.state !== "posted") continue; // drafts don't count anywhere
       add(out.posted);
       collected += t - res;
@@ -1028,7 +1048,7 @@
     return { generated_at: new Date().toISOString(), currency: CFG.CURRENCY, today,
       posted: out.posted, paid: out.paid, partial: out.partial,
       unpaid: out.unpaid, cancelled: out.cancelled, collected_today: collected,
-      posted_rows: postedRows,
+      posted_rows: postedRows, cancelled_rows: cancelledRows,
       by_rep: [...reps.values()].sort((a, b) => b.value - a.value) };
   }
 

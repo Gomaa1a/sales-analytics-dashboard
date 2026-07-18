@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Credit & Collections</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=54" />
+  <link rel="stylesheet" href="assets/css/style.css?v=56" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -45,10 +45,10 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=54"></script>
-  <script src="assets/js/auth.js?v=54"></script>
-  <script src="assets/js/common.js?v=54"></script>
-  <script src="assets/js/order-modal.js?v=54"></script>
+  <script src="assets/js/config.js?v=56"></script>
+  <script src="assets/js/auth.js?v=56"></script>
+  <script src="assets/js/common.js?v=56"></script>
+  <script src="assets/js/order-modal.js?v=56"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -56,7 +56,8 @@
     document.getElementById("pgTitle").textContent = D.t("debt_title");
     document.getElementById("pgSub").textContent = D.t("debt_page_sub");
     document.getElementById("tblTitle").textContent = D.t("debt_table_title");
-    document.getElementById("liveNote").textContent = D.t("debt_note_live");
+    document.getElementById("liveNote").innerHTML =
+      D.t("debt_note_live") + "<br>🔍 " + D.t("chk_aged"); // static i18n strings only
     document.getElementById("govTitle").textContent = D.t("debt_by_gov");
     document.getElementById("repTitle").textContent = D.t("debt_by_rep");
 
@@ -111,7 +112,7 @@
           <thead><tr>
             <th>${D.t("col_customer")}</th><th>${D.t("col_rep")}</th>
             <th>${D.t("col_gov")}</th><th>${D.t("col_city")}</th>
-            <th>${D.t("col_debit")}</th><th>${D.t("col_overdue")}</th>
+            <th>${D.t("col_total_open")}</th><th>${D.t("col_overdue")}</th>
           </tr></thead>
           <tbody>
           ${top.map(c => `<tr>

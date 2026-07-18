@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Sales Command Center</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=54" />
+  <link rel="stylesheet" href="assets/css/style.css?v=56" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -84,9 +84,9 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=54"></script>
-  <script src="assets/js/auth.js?v=54"></script>
-  <script src="assets/js/common.js?v=54"></script>
+  <script src="assets/js/config.js?v=56"></script>
+  <script src="assets/js/auth.js?v=56"></script>
+  <script src="assets/js/common.js?v=56"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -204,7 +204,8 @@
         const snap = await D.api("rep_debt");
         debtRows = [];
         (snap.reps || []).forEach(r => (r.customers || []).forEach(c =>
-          debtRows.push({ name: c.name, city: c.city, receivable: num(c.receivable), overdue: num(c.overdue), salesperson: r.salesperson })));
+          debtRows.push({ name: c.name, city: c.city, receivable: num(c.receivable), overdue: num(c.overdue),
+            salesperson: r.salesperson, user_id: r.user_id != null ? r.user_id : null })));
       } catch (e) { debtRows = []; }
       try { const a = await D.api("alerts"); alerts = a.alerts || []; } catch (e) { alerts = []; }
       try { collSnap = await D.api("collections"); } catch (e) { collSnap = null; }
@@ -255,9 +256,15 @@
       // vs the SAME number of days of last month, and only shows when last
       // month's invoices actually exist in the table (needs the v5.5
       // "BACKFILL Months" run once).
-      const revMonth = invMonth ? num(invMonth.value) : null;
+      // rep/customer filter narrows the month revenue card too (recomputed
+      // from invoice-level rows); MoM + target only make sense unfiltered
+      const repCustActive = !!(v.rep || v.cust);
+      const invMRowsF = (invMonth && invMonth.posted_rows && repCustActive)
+        ? filterInvRows(invMonth.posted_rows) : null;
+      const revMonth = invMonth
+        ? (invMRowsF ? invMRowsF.reduce((s, r) => s + r.value, 0) : num(invMonth.value)) : null;
       const momRev = invMonth ? pctOf(num(invMonth.value), num(invMonth.last_mtd)) : 0;
-      const momValid = !!(invMonth && invMonth.last_month_has_data && num(invMonth.last_mtd) > 0);
+      const momValid = !!(invMonth && !repCustActive && invMonth.last_month_has_data && num(invMonth.last_mtd) > 0);
       const attain = (TARGET > 0 && revMonth != null) ? Math.round(revMonth / TARGET * 100) : null;
       const pace = (revMonth != null && dayOfMonth > 0) ? Math.round(revMonth / dayOfMonth * daysInMonth) : revMonth;
       const paceVs = (TARGET > 0 && pace != null) ? Math.round(pace / TARGET * 100) : null;
@@ -313,9 +320,10 @@
       // First KPI = INVOICED today (accounting basis: posted customer
       // invoices dated today, per owner request) — labeled so it is never
       // confused with the order-based figures next to it.
-      const invPosted = invToday && invToday.posted;
+      const invS = invToday ? invStats() : null; // filtered like everything else
+      const invPosted = invS && invS.posted;
       const collectedPct = invPosted && invPosted.value > 0
-        ? Math.round(num(invToday.collected_today) / invPosted.value * 100) : null;
+        ? Math.round(invS.collected / invPosted.value * 100) : null;
       document.getElementById("todayKpis").innerHTML =
         kpi("", D.t("inv_today"), invPosted ? D.fmtMoney(invPosted.value) : "—",
           invPosted
@@ -331,18 +339,20 @@
       sect("invoices-today", () => renderInvToday(salesToday));
       sect("invoices-month-reps", renderInvMonthReps);
 
-      // ----- top debtors list (respect rep + customer filter) -----
-      const debtRC = debtRows.filter(r => (!v.rep || r.salesperson === v.rep) && (!v.cust || String(r.name || "").toLowerCase().includes(v.cust)));
+      // ----- top debtors list (respect rep + customer filter, uid-aware) -----
+      const debtRC = debtRows.filter(r =>
+        (!v.rep || r.salesperson === v.rep || (vRepUid != null && r.user_id === vRepUid)) &&
+        (!v.cust || String(r.name || "").toLowerCase().includes(v.cust)));
       const byOver = [...debtRC].sort((a, b) => b.overdue - a.overdue);
 
       // ----- hero cards -----
       const barCls = paceVs == null ? "" : (paceVs >= 100 ? "" : (paceVs >= 80 ? "warn" : "bad"));
       const momNote = momValid ? ` <span style="opacity:.65">· ${D.t("ex_vs_lmtd")}</span>` : "";
-      const targetBlock = TARGET > 0
+      const targetBlock = (TARGET > 0 && !repCustActive)
         ? `<div class="ex-bar ${barCls}"><i style="width:${Math.min(attain, 100)}%"></i></div>
            <div class="ex-sub"><b>${attain}%</b> ${D.t("ex_of_target")} (${D.fmtMoney(TARGET)}) · ${D.t("ex_pace")} <b>${D.fmtMoney(pace)}</b> (${paceVs}%)${momNote}</div>`
         : `<div class="ex-sub" style="margin-top:8px">${invMonth
-            ? `${D.fmtNum(invMonth.count)} ${D.t("invoices_w")} · ${D.t("ex_rev_collected")}: <b>${D.fmtMoney(num(invMonth.collected))}</b>`
+            ? `${D.fmtNum(invMRowsF ? invMRowsF.length : invMonth.count)} ${D.t("invoices_w")} · ${D.t("ex_rev_collected")}: <b>${D.fmtMoney(invMRowsF ? invMRowsF.reduce((s, r) => s + r.value - r.residual, 0) : num(invMonth.collected))}</b>`
             : D.t("loading")}${momNote}</div>`;
 
       document.getElementById("execHeads").innerHTML =
@@ -411,21 +421,27 @@
       // per-customer DSO comes from the collections snapshot (top overdue only)
       const dsoMap = {};
       ((collSnap && collSnap.overdue_customers) || []).forEach(c => { if (c.dso > 0) dsoMap[c.name] = Math.round(c.dso); });
+      // columns speak Odoo's Aged-Receivable vocabulary so viewers can map
+      // them 1:1: Overdue = the late columns · Not due yet = "At Date" ·
+      // Total open = the Total column. The footer names that exact screen.
       box.innerHTML = `
         <table class="dt">
-          <thead><tr><th>${D.t("col_customer")}</th><th>${D.t("col_rep")}</th><th>${D.t("col_overdue")}</th><th>${D.t("col_debit")}</th><th>${D.t("od_days")}</th></tr></thead>
+          <thead><tr><th>${D.t("col_customer")}</th><th>${D.t("col_rep")}</th><th>${D.t("col_overdue")}</th><th>${D.t("col_notdue")}</th><th>${D.t("col_total_open")}</th><th>${D.t("od_days")}</th></tr></thead>
           <tbody>
           ${top.map(r => {
             const dso = dsoMap[r.name];
+            const notDue = r.receivable - r.overdue;
             return `<tr>
             <td class="strong">${D.esc(r.name)}</td>
             <td class="muted">${D.esc(r.salesperson)}</td>
             <td class="amt"><span class="danger">${D.fmtMoney(r.overdue)}</span></td>
-            <td class="amt muted">${D.fmtMoney(r.receivable)}</td>
+            <td class="amt muted">${notDue > 0 ? D.fmtMoney(notDue) : "0"}</td>
+            <td class="amt"><b>${D.fmtMoney(r.receivable)}</b></td>
             <td class="amt">${dso != null ? `<span class="${dso > 60 ? "danger" : ""}">${D.fmtNum(dso)}</span>` : "—"}</td>
           </tr>`; }).join("")}
           </tbody>
-        </table>`;
+        </table>
+        <div class="muted" style="padding:9px 14px;font-size:11.5px">🔍 ${D.t("chk_aged")}</div>`;
     }
 
     /* ---- payments panels: the twin of the invoice cards, on the payment
@@ -483,6 +499,7 @@
         <div class="muted" style="padding:9px 14px;font-size:12px">
           <span class="ok">${D.fmtMoney(sum(cash))}</span> ${D.t("col_collected")} · ${D.t("pay_rejected")} + ${D.t("pay_cancelled")} ${D.t("pay_excluded_note")}
         </div>
+        <div class="muted" style="padding:0 14px 9px;font-size:11.5px">🔍 ${D.t("chk_pay")}</div>
         <div class="panel-head" style="border-top:1px solid var(--bdr)"><h2>${D.t("pay_by_rep")}</h2></div>
         ${repRows ? `<table class="dt">
           ${payRepHead()}
@@ -504,6 +521,7 @@
         <div class="muted" style="padding:9px 14px;font-size:12px">
           ${thisMonth} · ${D.fmtNum(rows.length)} ${D.t("payments_count")} ·
           <span class="ok">${D.fmtMoney(total)}</span>
+          <br>🔍 ${D.t("chk_pay_month")}
         </div>`;
     }
 
@@ -512,7 +530,10 @@
     function renderInvToday(orderedToday) {
       const box = document.getElementById("invTodayBox");
       if (!invToday) { box.innerHTML = `<div class="empty">${D.t("loading")}</div>`; return; }
-      const t = invToday;
+      // rebuild ALL status buckets from the FILTERED invoice-level rows, so
+      // the rep/customer filter narrows this whole card, not only the
+      // per-rep table (falls back to the global buckets on stale caches)
+      const t = invStats();
       const row = (label, b, cls) => `<tr${cls ? ` class="${cls}"` : ""}>
         <td class="strong">${label}</td>
         <td class="amt">${D.fmtNum(b.n)}</td>
@@ -520,7 +541,7 @@
         <td class="amt">${b.residual > 0 ? `<span class="danger">${D.fmtMoney(b.residual)}</span>` : `<span class="muted">0</span>`}</td>
       </tr>`;
       const gap = Math.max(0, num(orderedToday) - num(t.posted.value));
-      const repRows = repTableRows(t.posted_rows || []);
+      const repRows = repTableRows(invToday.posted_rows || []);
       box.innerHTML = `
         <table class="dt">
           <thead><tr><th>${D.t("ack_status")}</th><th>${D.t("col_count")}</th><th>${D.t("col_amount")}</th><th>${D.t("col_still_unpaid")}</th></tr></thead>
@@ -533,9 +554,10 @@
           </tbody>
         </table>
         <div class="muted" style="padding:9px 14px;font-size:12px">
-          <span class="ok">${D.fmtMoney(num(t.collected_today))}</span> ${D.t("collected_same_day")}
+          <span class="ok">${D.fmtMoney(t.collected)}</span> ${D.t("collected_same_day")}
           ${gap > 0 ? ` · ${D.fmtMoney(gap)} ${D.t("inv_gap_note")}` : ""}
         </div>
+        <div class="muted" style="padding:0 14px 9px;font-size:11.5px">🔍 ${D.t("chk_inv_today")}</div>
         ${repRows ? `
         <div class="panel-head" style="border-top:1px solid var(--bdr)"><h2>${D.t("inv_by_rep")}</h2></div>
         <table class="dt">
@@ -548,12 +570,43 @@
     // INVOICE-LEVEL rows client-side so BOTH filters apply: salesperson
     // (uid-aware — spellings differ between tables) and customer name.
     // Names are DB strings — they go through D.esc.
-    function invRepAgg(rows) {
+    // today's invoice stats over the FILTERED rows — same buckets as the
+    // builder, recomputed client-side so filters narrow the whole card.
+    // Falls back to the builder's global buckets if posted_rows is absent
+    // (stale 4-min cache from a pre-v56 load).
+    function invStats() {
+      const t = invToday;
+      if (!t || !t.posted_rows) {
+        return t ? { posted: t.posted, paid: t.paid, partial: t.partial, unpaid: t.unpaid,
+          cancelled: t.cancelled, collected: num(t.collected_today) } : null;
+      }
+      const rows = filterInvRows(t.posted_rows);
+      const canc = filterInvRows(t.cancelled_rows || []);
+      const B = a => ({ n: a.length,
+        value: a.reduce((s, r) => s + r.value, 0),
+        residual: a.reduce((s, r) => s + r.residual, 0) });
+      const posted = B(rows);
+      return {
+        posted,
+        paid: B(rows.filter(r => r.residual === 0)),
+        partial: B(rows.filter(r => r.residual > 0 && r.residual < r.value)),
+        unpaid: B(rows.filter(r => r.residual !== 0 && r.residual >= r.value)),
+        cancelled: B(canc),
+        collected: posted.value - posted.residual
+      };
+    }
+
+    // apply the page's rep (uid-aware) + customer filters to invoice-level rows
+    function filterInvRows(rows) {
       const v = fb.values();
       const uid = v.rep ? repUid(v.rep) : null;
       let list = rows || [];
       if (v.rep) list = list.filter(r => (uid != null && r.user_id === uid) || r.salesperson === v.rep);
       if (v.cust) list = list.filter(r => String(r.partner_name || "").toLowerCase().includes(v.cust));
+      return list;
+    }
+    function invRepAgg(rows) {
+      const list = filterInvRows(rows);
       const m = new Map();
       list.forEach(r => {
         const k = r.user_id != null ? r.user_id : (r.salesperson || "—");
@@ -590,6 +643,7 @@
         <div class="muted" style="padding:9px 14px;font-size:12px">
           ${invMonth.month} · ${D.fmtNum(invMonth.count)} ${D.t("invoices_w")} ·
           <span class="ok">${D.fmtMoney(num(invMonth.collected))}</span> ${D.t("collected_so_far")}
+          <br>🔍 ${D.t("chk_inv_month")}
         </div>`;
     }
 
