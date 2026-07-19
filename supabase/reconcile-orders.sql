@@ -13,6 +13,9 @@
 -- Service-role only: the dashboard's anon/authenticated keys cannot
 -- call it.
 -- ============================================================
+-- Scope is DATE_ORDER (2026-07-18): the whole orders pipeline slices by
+-- order date now — orders dated 2026 but created earlier were invisible
+-- to create_date slicing (owner found 2,205 vs 2,046 July-dated orders).
 create or replace function public.reconcile_orders(keep_ids int8[])
 returns table (order_id int8, order_name text, state text)
 language sql
@@ -20,7 +23,7 @@ security definer
 set search_path = public
 as $$
   delete from public.dashboard_orders o
-  where o.create_date >= '2026-01-01'
+  where o.date_order >= '2026-01-01'
     and not (o.order_id = any (keep_ids))
   returning o.order_id, o.order_name, o.state;
 $$;
