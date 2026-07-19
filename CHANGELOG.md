@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-07-18 — Cities & Governorates in ODOO-EXACT mode (v59)
+
+- Owner decision: the Regions page must read like Odoo's own State
+  grouping, label for label. Governorate = the customer's **State string
+  verbatim** (incl. "(IQ)"), city = the **City field verbatim**, empty =
+  the same **"بدون (None)"** bucket Odoo's pivot shows — the dictionary
+  normalization (govOf) is no longer used on this page.
+- None rows carry a ⚠️ amber badge (tooltip: the State field is empty on
+  the customer form) and the banner totals the None bucket — same
+  worklist on both screens; the customer's CITY still shows for those
+  rows so they remain identifiable.
+- Basis note rewritten with the exact verification recipe (incl. the
+  "Sales Analysis Count = product lines, not orders" trap).
+- Raw DB strings now escaped in the gov select/tables (they were
+  dictionary constants before).
+- Cache-bust v=59.
+
 ## 2026-07-18 — "Orders by day" table, the numeric twin of Odoo's list (v57)
 
 - New collapsible panel at the top of the Rhythm section: **Orders by
