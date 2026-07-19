@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Cities & Governorates</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=58" />
+  <link rel="stylesheet" href="assets/css/style.css?v=59" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -52,9 +52,9 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=58"></script>
-  <script src="assets/js/auth.js?v=58"></script>
-  <script src="assets/js/common.js?v=58"></script>
+  <script src="assets/js/config.js?v=59"></script>
+  <script src="assets/js/auth.js?v=59"></script>
+  <script src="assets/js/common.js?v=59"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -99,24 +99,23 @@
 
     async function loadWindow(from, to) {
       try {
-        // dashboard_customers(governorate,city) = the customer MASTER's data
-        // from Odoo (state_id + city/city_id), embedded through the
-        // orders→customers FK. Preference: real governorate → master city →
-        // the order's own city snapshot → nocity. All partner data.
+        // ODOO-EXACT mode (owner decision 2026-07-18): governorate = the
+        // customer's State string VERBATIM (incl. "(IQ)"), city = the City
+        // field verbatim, empty = the same "None" bucket Odoo shows. No
+        // dictionary, no merging — this page must read like Odoo's own
+        // State grouping, label for label, so anyone can compare 1:1.
         const rows = await D.loadOrders({ from, to, dateField: "date_order",
           select: "order_id,city,state,amount_total,create_date,date_order,dashboard_customers(governorate,city)" });
         loadedFrom = from; loadedTo = to;
-        // aggregate confirmed orders by city, tagging each with its governorate
+        const NONE = D.t("gov_none");
         const m = {};
         rows.filter(isConf).forEach(o => {
           const mc = o.dashboard_customers || {};
-          const masterCity = mc.city ? String(mc.city).trim() : "";
-          const city = masterCity || ((o.city && o.city !== "—") ? String(o.city).trim() : "—");
-          const realGov = mc.governorate
-            ? String(mc.governorate).replace(/\s*\(.*?\)\s*$/, "").trim() : "";
-          const g = D.govOf(realGov || city);
-          const key = g.key + "||" + city;
-          if (!m[key]) m[key] = { city, govKey: g.key, govLabel: D.govLabel(g.key), orders: 0, value: 0 };
+          const gov = (mc.governorate && String(mc.governorate).trim()) || NONE;
+          const city = (mc.city && String(mc.city).trim()) ||
+            ((o.city && o.city !== "—") ? String(o.city).trim() : NONE);
+          const key = gov + "||" + city;
+          if (!m[key]) m[key] = { city, govKey: gov, govLabel: gov, orders: 0, value: 0 };
           m[key].orders++; m[key].value += val(o);
         });
         cityRows = Object.values(m);
@@ -131,7 +130,7 @@
       const list = Object.values(g).sort((a, b) => b.value - a.value);
       const sel = $("govSel"); const cur = sel.value;
       sel.innerHTML = `<option value="">${D.t("gov_all")}</option>` +
-        list.map(x => `<option value="${x.key}"${x.key === cur ? " selected" : ""}>${x.label}</option>`).join("");
+        list.map(x => `<option value="${D.esc(x.key)}"${x.key === cur ? " selected" : ""}>${D.esc(x.label)}</option>`).join("");
     }
 
     function render() {
@@ -149,22 +148,16 @@
       const totalVal = govs.reduce((s, x) => s + x.value, 0) || 1;
       $("cnt").textContent = `${D.fmtNum(govs.length)} ${D.t("govs_title")} · ${D.fmtNum(cities.length)} ${D.t("cities_title")}`;
 
-      // Surface how much value/how many orders escape classification, split by
-      // cause so each has its own fix: "nocity" = the Odoo record has no city
-      // (fill it in Odoo); "unknown" = city text the dictionary doesn't know
-      // (add it to CITY2GOV). Lumping them together hid the real problem.
-      const bannerLine = (bg, fg, bd, label, bucket, note) => {
-        const pct = Math.round(bucket.value / totalVal * 100);
-        return `<div class="err" style="background:${bg};color:${fg};border:1px solid ${bd};border-radius:10px;padding:10px 14px;margin:0 2px 12px;font-size:13px">` +
-          `⚠️ <b>${label}:</b> ${D.fmtNum(bucket.orders)} ${D.t("orders")} · ${D.fmtMoney(bucket.value)} (${pct}%). ${note}</div>`;
-      };
-      const unk = gmap["unknown"], noc = gmap["nocity"];
+      // Surface Odoo's "None" bucket (customers with an empty State field) —
+      // the same row Odoo's pivot shows, with the same fix: fill the field.
+      const noc = gmap[D.t("gov_none")];
       const banner = $("unmappedBanner");
-      let bHtml = "";
-      if (noc && noc.value > 0) bHtml += bannerLine("#fee2e2", "#991b1b", "#fecaca", D.t("nocity"), noc, D.t("nocity_note"));
-      if (unk && unk.value > 0) bHtml += bannerLine("#fef3c7", "#92400e", "#fde68a", D.t("unmapped"), unk, D.t("unmapped_note"));
-      banner.style.display = bHtml ? "" : "none";
-      banner.innerHTML = bHtml;
+      if (noc && noc.value > 0) {
+        const pct = Math.round(noc.value / totalVal * 100);
+        banner.innerHTML = `<div class="err" style="background:#fef3c7;color:#92400e;border:1px solid #fde68a;border-radius:10px;padding:10px 14px;margin:0 2px 12px;font-size:13px">` +
+          `⚠️ <b>${D.t("gov_none")}:</b> ${D.fmtNum(noc.orders)} ${D.t("orders")} · ${D.fmtMoney(noc.value)} (${pct}%). ${D.t("gov_none_note")}</div>`;
+        banner.style.display = "";
+      } else { banner.style.display = "none"; banner.innerHTML = ""; }
 
       // governorate chart
       const ctx = $("govChart");
@@ -184,8 +177,10 @@
         <table class="dt">
           <thead><tr><th>${D.t("col_gov")}</th><th>${D.t("cities_count")}</th><th>${D.t("orders")}</th><th>${D.t("col_amount")}</th><th>${D.t("share")}</th></tr></thead>
           <tbody>
-          ${govs.map(x => `<tr class="gov-row" data-gov="${x.key}" style="cursor:pointer">
-            <td class="strong">${x.label}</td>
+          ${govs.map(x => `<tr class="gov-row" data-gov="${D.esc(x.key)}" style="cursor:pointer">
+            <td class="strong">${x.key === D.t("gov_none")
+              ? `<span title="${D.esc(D.t("gov_none_note"))}" style="color:#92400e;background:#fef3c7;padding:2px 8px;border-radius:999px">⚠️ ${D.esc(x.label)}</span>`
+              : D.esc(x.label)}</td>
             <td>${D.fmtNum(x.cities)}</td>
             <td>${D.fmtNum(x.orders)}</td>
             <td class="amt">${D.fmtMoney(x.value)}</td>
@@ -203,7 +198,9 @@
           <tbody>
           ${cityList.map(r => `<tr>
             <td class="strong">${D.esc(r.city)}</td>
-            <td class="muted">${r.govLabel}</td>
+            <td class="muted">${r.govKey === D.t("gov_none")
+              ? `<span title="${D.esc(D.t("gov_none_note"))}" style="color:#92400e;background:#fef3c7;padding:2px 8px;border-radius:999px;font-size:11.5px">⚠️ ${D.esc(r.govLabel)}</span>`
+              : D.esc(r.govLabel)}</td>
             <td>${D.fmtNum(r.orders)}</td>
             <td class="amt">${D.fmtMoney(r.value)}</td>
             <td class="muted">${Math.round(r.value / totalVal * 100)}%</td>
