@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Credit & Collections</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=60" />
+  <link rel="stylesheet" href="assets/css/style.css?v=61" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -45,10 +45,10 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=60"></script>
-  <script src="assets/js/auth.js?v=60"></script>
-  <script src="assets/js/common.js?v=60"></script>
-  <script src="assets/js/order-modal.js?v=60"></script>
+  <script src="assets/js/config.js?v=61"></script>
+  <script src="assets/js/auth.js?v=61"></script>
+  <script src="assets/js/common.js?v=61"></script>
+  <script src="assets/js/order-modal.js?v=61"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -116,7 +116,9 @@
           </tr></thead>
           <tbody>
           ${top.map(c => `<tr>
-            <td class="strong">${D.esc(c.name)}</td>
+            <td class="strong">${c.partner_id != null
+              ? `<a class="order-link cust-link" data-pid="${D.esc(c.partner_id)}" data-name="${D.esc(c.name)}">${D.esc(c.name)}</a>`
+              : D.esc(c.name)}</td>
             <td class="muted">${D.esc(c.salesperson)}</td>
             <td class="muted">${D.govLabel(D.govOf(c.city).key)}</td>
             <td class="muted">${D.esc(c.city || "—")}</td>
@@ -125,6 +127,81 @@
           </tr>`).join("")}
           </tbody>
         </table>`;
+      // click a customer → open-invoice detail modal
+      box.querySelectorAll(".cust-link").forEach(a =>
+        a.addEventListener("click", () => openCustomer(a.dataset.pid, a.dataset.name)));
+    }
+
+    /* ---- customer drill-down: every open invoice with its dates,
+       amount, remaining, and days overdue — the row-level proof that
+       matches the customer's expanded row in Odoo's Aged Receivable ---- */
+    function ensureCustModal() {
+      let m = document.getElementById("custModal");
+      if (m) return m;
+      m = document.createElement("div");
+      m.id = "custModal";
+      m.className = "modal-overlay";
+      m.innerHTML = `
+        <div class="modal" role="dialog" aria-modal="true">
+          <div class="modal-head">
+            <div id="cmTitle" class="modal-title"></div>
+            <button id="cmClose" class="icon-btn" type="button">✕</button>
+          </div>
+          <div id="cmBody" class="modal-body" style="padding:0"></div>
+        </div>`;
+      document.body.appendChild(m);
+      m.addEventListener("click", e => { if (e.target === m) m.classList.remove("open"); });
+      m.querySelector("#cmClose").addEventListener("click", () => m.classList.remove("open"));
+      document.addEventListener("keydown", e => { if (e.key === "Escape") m.classList.remove("open"); });
+      return m;
+    }
+
+    async function openCustomer(pid, name) {
+      const m = ensureCustModal();
+      m.querySelector("#cmTitle").textContent = D.t("cust_detail") + " — " + name;
+      const body = m.querySelector("#cmBody");
+      body.innerHTML = `<div class="empty">${D.t("loading")}</div>`;
+      m.classList.add("open");
+      try {
+        const today = D.bagDay(new Date().toISOString());
+        const inv = await D.sbGetAll(
+          `dashboard_invoices?select=name,invoice_date,due_date,amount_total,amount_residual` +
+          `&partner_id=eq.${encodeURIComponent(pid)}&state=eq.posted&amount_residual=neq.0` +
+          `&order=due_date.asc,invoice_id.asc`);
+        if (!inv.length) { body.innerHTML = `<div class="empty">${D.t("no_data")}</div>`; return; }
+        const num = n => Number(n) || 0;
+        let recv = 0, over = 0;
+        const rowsHtml = inv.map(x => {
+          const res = num(x.amount_residual);
+          const due = x.due_date ? String(x.due_date).slice(0, 10) : "";
+          const late = due && due < today ? Math.round((Date.parse(today) - Date.parse(due)) / 864e5) : 0;
+          recv += res; if (due && due < today) over += res;
+          return `<tr>
+            <td class="strong">${D.esc(x.name)}</td>
+            <td class="muted">${D.esc(String(x.invoice_date || "—").slice(0, 10))}</td>
+            <td class="muted">${due || "—"}</td>
+            <td class="amt">${D.fmtMoney(num(x.amount_total))}</td>
+            <td class="amt">${res < 0 ? `<span class="ok">${D.fmtMoney(res)}</span>` : D.fmtMoney(res)}</td>
+            <td class="amt">${late > 0 ? `<span class="${late > 60 ? "danger" : ""}">${D.fmtNum(late)}</span>` : `<span class="muted">—</span>`}</td>
+          </tr>`;
+        }).join("");
+        body.innerHTML = `
+          <table class="dt">
+            <thead><tr>
+              <th>${D.t("col_invoice")}</th><th>${D.t("col_inv_date")}</th><th>${D.t("col_due_date")}</th>
+              <th>${D.t("col_amount")}</th><th>${D.t("col_still_unpaid")}</th><th>${D.t("od_days")}</th>
+            </tr></thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+          <div style="padding:11px 14px;font-size:13px;border-top:1px solid var(--bdr)">
+            ${D.t("col_total_open")}: <b>${D.fmtMoney(recv)}</b> ·
+            ${D.t("col_overdue")}: <span class="danger"><b>${D.fmtMoney(over)}</b></span> ·
+            ${D.t("col_notdue")}: <b>${D.fmtMoney(recv - over)}</b>
+          </div>
+          <div class="muted" style="padding:9px 14px;font-size:11.5px">🔍 ${D.t("chk_partner")}</div>`;
+      } catch (e) {
+        body.innerHTML = `<div class="err">${D.t("error_load")}</div>`;
+      }
     }
 
     function drawGov(f) {
@@ -171,7 +248,8 @@
       D.setUpdated(snap.generated_at);
       rows = [];
       (snap.reps || []).forEach(r => (r.customers || []).forEach(c => {
-        rows.push({ name: c.name, city: c.city, receivable: c.receivable || 0, overdue: c.overdue || 0,
+        rows.push({ partner_id: c.partner_id != null ? c.partner_id : null,
+          name: c.name, city: c.city, receivable: c.receivable || 0, overdue: c.overdue || 0,
           salesperson: r.salesperson, user_id: r.user_id != null ? r.user_id : null });
       }));
       // master list + debt-snapshot spellings, matched by user_id first

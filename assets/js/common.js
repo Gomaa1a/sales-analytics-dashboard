@@ -78,6 +78,11 @@
       pay_grand_total: "الإجمالي شاملاً المرفوضة والملغاة",
       col_notdue: "غير مستحق بعد",
       col_total_open: "إجمالي الذمة",
+      cust_detail: "كشف العميل — الفواتير المفتوحة",
+      col_invoice: "الفاتورة",
+      col_inv_date: "تاريخ الفاتورة",
+      col_due_date: "الاستحقاق",
+      chk_partner: "للمطابقة مع أودو: افتح صف العميل في «أعمار الذمم» (سهم التوسيع) أو «دفتر الشريك» — نفس الأسطر والمبالغ وتواريخ الاستحقاق.",
       chk_aged: "للمطابقة مع أودو: المحاسبة ← التقارير ← أعمار الذمم — «المتأخر» = مجموع أعمدة التأخير (1-30…الأقدم)، «غير مستحق بعد» = عمود At Date، «إجمالي الذمة» = عمود الإجمالي.",
       chk_inv_today: "للمطابقة مع أودو: المحاسبة ← فواتير العملاء — تصفية «تاريخ الفاتورة = اليوم» والتجميع حسب حالة الدفع.",
       chk_pay: "للمطابقة مع أودو: المحاسبة ← مدفوعات العملاء — التجميع حسب الحالة (المبالغ بإشارتها: الاسترجاع بالسالب).",
@@ -392,6 +397,11 @@
       pay_grand_total: "Total incl. rejected & cancelled",
       col_notdue: "Not due yet",
       col_total_open: "Total open",
+      cust_detail: "Customer detail — open invoices",
+      col_invoice: "Invoice",
+      col_inv_date: "Invoice date",
+      col_due_date: "Due date",
+      chk_partner: "Verify in Odoo: expand the customer's row in Aged Receivable (the arrow) or open their Partner Ledger — same lines, amounts, and due dates.",
       chk_aged: "Verify in Odoo: Accounting → Reporting → Aged Receivable — Overdue = the late columns (1-30…Older), Not due yet = the At Date column, Total open = the Total column.",
       chk_inv_today: "Verify in Odoo: Accounting → Customer Invoices — filter Invoice Date = today, group by Payment Status.",
       chk_pay: "Verify in Odoo: Accounting → Customer Payments — group by Status (signed amounts: refunds negative).",
@@ -888,6 +898,7 @@
       if (!cust.has(pid)) {
         const c = idmap.get(i.partner_id) || {};
         cust.set(pid, {
+          partner_id: i.partner_id != null ? i.partner_id : null,
           name: c.complete_name || i.partner_name || "—",
           city: c.governorate || c.city || "",
           user_id: c.user_id != null ? c.user_id : (i.user_id != null ? i.user_id : null),
@@ -930,7 +941,8 @@
         customers: [], receivable_total: 0, overdue_total: 0
       });
       const r = reps.get(key);
-      r.customers.push({ name: c.name, city: c.city, receivable: c.receivable, overdue: c.overdue });
+      r.customers.push({ partner_id: c.partner_id != null ? c.partner_id : null,
+        name: c.name, city: c.city, receivable: c.receivable, overdue: c.overdue });
       r.receivable_total += c.receivable; r.overdue_total += c.overdue;
     }
     const repList = [...reps.values()]
