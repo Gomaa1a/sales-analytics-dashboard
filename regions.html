@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Cities & Governorates</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=63" />
+  <link rel="stylesheet" href="assets/css/style.css?v=64" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -53,9 +53,9 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=63"></script>
-  <script src="assets/js/auth.js?v=63"></script>
-  <script src="assets/js/common.js?v=63"></script>
+  <script src="assets/js/config.js?v=64"></script>
+  <script src="assets/js/auth.js?v=64"></script>
+  <script src="assets/js/common.js?v=64"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -81,6 +81,11 @@
     const setBasisNote = () => { document.getElementById("basisNote").textContent = D.t(basis === "inv" ? "region_basis_inv" : "region_basis"); };
     setBasisNote();
     const countLabel = () => basis === "inv" ? D.t("invoices_w") : D.t("orders");
+    // invoice mode shows two money columns: Gross (invoices) + Net (after
+    // credit notes = Odoo's total). Orders mode shows the single amount.
+    const amtHeader = () => basis === "inv" ? D.t("col_gross") : D.t("col_amount");
+    const netTh = () => basis === "inv" ? `<th>${D.t("col_net")}</th>` : "";
+    const netTd = r => basis === "inv" ? `<td class="amt"><b>${D.fmtMoney(r.net)}</b></td>` : "";
 
     const PALETTE = ["#2563eb","#7c3aed","#16a34a","#d97706","#dc2626","#0891b2","#db2777","#65a30d","#9333ea","#0d9488","#ea580c","#4f46e5"];
     const isConf = o => o.state === "sale" || o.state === "done";
@@ -138,19 +143,20 @@
         const city = (mc.city && String(mc.city).trim()) ||
           ((o.city && o.city !== "—") ? String(o.city).trim() : NONE);
         const key = gov + "||" + city;
-        if (!m[key]) m[key] = { city, govKey: gov, govLabel: gov, orders: 0, value: 0 };
-        m[key].orders++; m[key].value += val(o);
+        if (!m[key]) m[key] = { city, govKey: gov, govLabel: gov, orders: 0, value: 0, net: 0 };
+        const a = val(o); m[key].orders++; m[key].value += a; m[key].net += a; // orders: net = gross
       });
       return Object.values(m);
     }
 
-    // INVOICES basis: posted INV/ documents by invoice date, tax-inclusive
-    // (= Odoo Accounting → Invoices grouped by Customer State). Governorate
-    // & city come from the customer master (invoices carry no city).
+    // INVOICES basis: posted customer invoices + credit notes by invoice
+    // date (= Odoo Accounting → Invoices grouped by Customer State). Gross =
+    // positive invoices only; Net = after credit notes (RINv/, negative once
+    // the sync's signed-amount fix has run). Gov/city from the customer master.
     async function loadInvoices(from, to) {
       const [inv, custRows] = await Promise.all([
-        D.sbGetAll(`dashboard_invoices?select=invoice_id,partner_id,amount_total` +
-          `&state=eq.posted&name=like.INV*&invoice_date=gte.${from}&invoice_date=lt.${D.nextDay(to)}&order=invoice_id.desc`),
+        D.sbGetAll(`dashboard_invoices?select=invoice_id,partner_id,amount_total,name` +
+          `&state=eq.posted&or=(name.like.INV*,name.like.RINv*)&invoice_date=gte.${from}&invoice_date=lt.${D.nextDay(to)}&order=invoice_id.desc`),
         D.sbGetAll("dashboard_customers?select=partner_id,governorate,city&order=partner_id.desc")
       ]);
       const cmap = new Map(); custRows.forEach(c => cmap.set(c.partner_id, c));
@@ -161,8 +167,11 @@
         const gov = (c.governorate && String(c.governorate).trim()) || NONE;
         const city = (c.city && String(c.city).trim()) || NONE;
         const key = gov + "||" + city;
-        if (!m[key]) m[key] = { city, govKey: gov, govLabel: gov, orders: 0, value: 0 };
-        m[key].orders++; m[key].value += Number(x.amount_total) || 0;
+        if (!m[key]) m[key] = { city, govKey: gov, govLabel: gov, orders: 0, value: 0, net: 0 };
+        const amt = Number(x.amount_total) || 0;
+        m[key].orders++;                 // document count (invoices + credit notes)
+        if (amt > 0) m[key].value += amt; // gross = positive invoices
+        m[key].net += amt;                // net = gross + credit notes (negative)
       });
       return Object.values(m);
     }
@@ -187,7 +196,7 @@
 
       // governorates derived from the filtered cities (hierarchical: govs first)
       const gmap = {};
-      cities.forEach(r => { if (!gmap[r.govKey]) gmap[r.govKey] = { key: r.govKey, label: r.govLabel, orders: 0, value: 0, cities: 0 }; const e = gmap[r.govKey]; e.orders += r.orders; e.value += r.value; e.cities++; });
+      cities.forEach(r => { if (!gmap[r.govKey]) gmap[r.govKey] = { key: r.govKey, label: r.govLabel, orders: 0, value: 0, net: 0, cities: 0 }; const e = gmap[r.govKey]; e.orders += r.orders; e.value += r.value; e.net += (r.net != null ? r.net : r.value); e.cities++; });
       const govs = Object.values(gmap).sort((a, b) => b.value - a.value);
       const totalVal = govs.reduce((s, x) => s + x.value, 0) || 1;
       $("cnt").textContent = `${D.fmtNum(govs.length)} ${D.t("govs_title")} · ${D.fmtNum(cities.length)} ${D.t("cities_title")}`;
@@ -209,7 +218,7 @@
       chart = new Chart(ctx, {
         type: "bar",
         data: { labels: govs.map(x => x.label), datasets: [{ label: D.t("kpi_value"),
-          data: govs.map(x => x.value), backgroundColor: govs.map((_, i) => PALETTE[i % PALETTE.length]), borderRadius: 6 }] },
+          data: govs.map(x => basis === "inv" ? x.net : x.value), backgroundColor: govs.map((_, i) => PALETTE[i % PALETTE.length]), borderRadius: 6 }] },
         options: { indexAxis: "y", maintainAspectRatio: false,
           plugins: { legend: { display: false }, tooltip: { callbacks: {
             label: c => `${D.fmtMoneyFull(c.parsed.x)} · ${D.fmtNum(govs[c.dataIndex].orders)} ${countLabel()}` } } },
@@ -219,7 +228,7 @@
       // governorate table (click a row to drill into its cities)
       $("govTable").innerHTML = govs.length ? `
         <table class="dt">
-          <thead><tr><th>${D.t("col_gov")}</th><th>${D.t("cities_count")}</th><th>${countLabel()}</th><th>${D.t("col_amount")}</th><th>${D.t("share")}</th></tr></thead>
+          <thead><tr><th>${D.t("col_gov")}</th><th>${D.t("cities_count")}</th><th>${countLabel()}</th><th>${amtHeader()}</th>${netTh()}<th>${D.t("share")}</th></tr></thead>
           <tbody>
           ${govs.map(x => `<tr class="gov-row" data-gov="${D.esc(x.key)}" style="cursor:pointer">
             <td class="strong">${x.key === D.t("gov_none")
@@ -227,7 +236,7 @@
               : D.esc(x.label)}</td>
             <td>${D.fmtNum(x.cities)}</td>
             <td>${D.fmtNum(x.orders)}</td>
-            <td class="amt">${D.fmtMoney(x.value)}</td>
+            <td class="amt">${D.fmtMoney(x.value)}</td>${netTd(x)}
             <td class="muted">${Math.round(x.value / totalVal * 100)}%</td>
           </tr>`).join("")}
           </tbody>
@@ -238,7 +247,7 @@
       const cityList = [...cities].sort((a, b) => b.value - a.value).slice(0, 300);
       $("cityTable").innerHTML = cityList.length ? `
         <table class="dt">
-          <thead><tr><th>${D.t("region")}</th><th>${D.t("col_gov")}</th><th>${countLabel()}</th><th>${D.t("col_amount")}</th><th>${D.t("share")}</th></tr></thead>
+          <thead><tr><th>${D.t("region")}</th><th>${D.t("col_gov")}</th><th>${countLabel()}</th><th>${amtHeader()}</th>${netTh()}<th>${D.t("share")}</th></tr></thead>
           <tbody>
           ${cityList.map(r => `<tr>
             <td class="strong">${D.esc(r.city)}</td>
@@ -246,7 +255,7 @@
               ? `<span title="${D.esc(D.t("gov_none_note"))}" style="color:#92400e;background:#fef3c7;padding:2px 8px;border-radius:999px;font-size:11.5px">⚠️ ${D.esc(r.govLabel)}</span>`
               : D.esc(r.govLabel)}</td>
             <td>${D.fmtNum(r.orders)}</td>
-            <td class="amt">${D.fmtMoney(r.value)}</td>
+            <td class="amt">${D.fmtMoney(r.value)}</td>${netTd(r)}
             <td class="muted">${Math.round(r.value / totalVal * 100)}%</td>
           </tr>`).join("")}
           </tbody>
