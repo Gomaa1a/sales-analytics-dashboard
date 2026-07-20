@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Salespeople</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=62" />
+  <link rel="stylesheet" href="assets/css/style.css?v=63" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -20,43 +20,57 @@
       <p id="pgSub"></p>
     </div>
 
+    <div class="filters"><select id="basisSel" class="fb-sel"></select></div>
     <div class="filters" id="fbHost"></div>
 
-    <div id="kpis" class="kpi-grid" data-src="dashboard_orders"></div>
+    <div id="kpis" class="kpi-grid" data-src="dashboard_orders dashboard_invoices"></div>
 
-    <div class="panel" data-src="dashboard_orders">
+    <div class="panel" data-src="dashboard_orders dashboard_invoices">
       <div class="panel-head"><h2 id="cmpTitle"></h2></div>
       <div class="panel-body"><div class="chart-box tall"><canvas id="cmpChart"></canvas></div></div>
     </div>
 
-    <div id="repCards" class="rep-grid" data-src="dashboard_orders"></div>
+    <div id="repCards" class="rep-grid" data-src="dashboard_orders dashboard_invoices"></div>
     <div class="foot">Dabboos Sales Command Center · n8n + Odoo</div>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=62"></script>
-  <script src="assets/js/auth.js?v=62"></script>
-  <script src="assets/js/common.js?v=62"></script>
+  <script src="assets/js/config.js?v=63"></script>
+  <script src="assets/js/auth.js?v=63"></script>
+  <script src="assets/js/common.js?v=63"></script>
   <script>
   (function () {
     const D = window.DASH;
     D.buildChrome("sales");
     document.getElementById("pgTitle").textContent = D.t("sales_title");
-    document.getElementById("pgSub").textContent = D.t("sales_sub");
-    document.getElementById("cmpTitle").textContent = D.t("sales_title") + " — " + D.t("wow");
 
     const isConf = o => o.state === "sale" || o.state === "done";
     const val = o => Number(o.amount_total) || 0;
     const num = n => Number(n) || 0;
     const kpi = (cls, label, n, sub) => `<div class="kpi ${cls}"><div class="kpi-l">${label}</div><div class="kpi-n">${n}</div><div class="kpi-sub">${sub || "&nbsp;"}</div></div>`;
 
+    // basis toggle: Orders (what each rep sold) vs Invoices (what was billed
+    // under their name). Same week/month buckets, so each is comparable with
+    // its own Odoo screen. Persisted per browser.
+    let basis = localStorage.getItem("sales_basis") === "inv" ? "inv" : "ord";
+    const basisSel = document.getElementById("basisSel");
+    basisSel.innerHTML =
+      `<option value="ord"${basis === "ord" ? " selected" : ""}>${D.t("basis_orders")}</option>` +
+      `<option value="inv"${basis === "inv" ? " selected" : ""}>${D.t("basis_invoices")}</option>`;
+    const countLabel = () => basis === "inv" ? D.t("invoices_w") : D.t("orders");
+    const setSub = () => {
+      document.getElementById("pgSub").textContent = D.t("sales_sub") + " — 🔍 " + D.t(basis === "inv" ? "chk_inv_month" : "chk_orders");
+      document.getElementById("cmpTitle").textContent = D.t("sales_title") + " — " + D.t("wow") + " · " + D.t(basis === "inv" ? "basis_invoices" : "basis_orders");
+    };
+    setSub();
+
     let cmpChart = null; const sparks = {};
-    let allRows = [], loadedFrom = null, loadedTo = null;
+    let items = [], loadedFrom = null, loadedTo = null, loadedBasis = null;
     let masterReps = [];
-    // name → user id across spellings (master first, then loaded orders)
+    // name → user id across spellings (master first, then the loaded items)
     const repUid = name => {
       const hit = masterReps.find(r => r.name === name) ||
-        allRows.find(o => o.salesperson === name && o.user_id != null);
+        items.find(o => o.salesperson === name && o.user_id != null);
       return hit ? (hit.user_id != null ? hit.user_id : null) : null;
     };
 
@@ -94,30 +108,43 @@
 
     async function loadWindow(from, to) {
       try {
-        [allRows, masterReps] = await Promise.all([
-          D.loadOrders({ from, to, dateField: "date_order",
-            select: "order_id,salesperson,user_id,partner_name,state,amount_total,create_date,date_order" }),
-          D.loadSalespeopleMaster()
-        ]);
-        loadedFrom = from; loadedTo = to;
-        // this dropdown was never populated before v54 — feed it the master
-        // list plus every spelling seen in the loaded orders
-        fb.setReps([...masterReps.map(r => r.name), ...allRows.map(o => o.salesperson)]);
+        let mr;
+        if (basis === "inv") {
+          // posted INV documents by invoice date, per invoice salesperson
+          let inv; [inv, mr] = await Promise.all([
+            D.sbGetAll(`dashboard_invoices?select=invoice_id,salesperson,user_id,partner_name,amount_total,invoice_date` +
+              `&state=eq.posted&name=like.INV*&invoice_date=gte.${from}&invoice_date=lt.${D.nextDay(to)}&order=invoice_id.desc`),
+            D.loadSalespeopleMaster()
+          ]);
+          items = inv.map(x => ({ salesperson: x.salesperson || "—", user_id: x.user_id != null ? x.user_id : null,
+            partner_name: x.partner_name || "", date: String(x.invoice_date || "").slice(0, 10), value: num(x.amount_total) }));
+        } else {
+          // confirmed sale orders by order date
+          let rows; [rows, mr] = await Promise.all([
+            D.loadOrders({ from, to, dateField: "date_order",
+              select: "order_id,salesperson,user_id,partner_name,state,amount_total,create_date,date_order" }),
+            D.loadSalespeopleMaster()
+          ]);
+          items = rows.filter(isConf).map(o => ({ salesperson: o.salesperson || "—", user_id: o.user_id != null ? o.user_id : null,
+            partner_name: o.partner_name || "", date: String(o.date_order || o.create_date || "").slice(0, 10), value: val(o) }));
+        }
+        masterReps = mr; loadedFrom = from; loadedTo = to; loadedBasis = basis;
+        fb.setReps([...masterReps.map(r => r.name), ...items.map(o => o.salesperson)]);
         D.setUpdated(new Date().toISOString());
-      } catch (e) { allRows = []; document.getElementById("repCards").innerHTML = `<div class="err">${D.t("error_load")}</div>`; }
+      } catch (e) { items = []; document.getElementById("repCards").innerHTML = `<div class="err">${D.t("error_load")}</div>`; }
     }
 
     function compute() {
       const v = fb.values();
       const from = v.from || monthStart, to = v.to || today;
       const uid = v.rep ? repUid(v.rep) : null;
-      const conf = allRows.filter(o => isConf(o) &&
+      const list = items.filter(o =>
         (!v.rep || o.salesperson === v.rep || (uid != null && o.user_id === uid)) &&
-        fb.match(o, { cust: "partner_name" }));
+        (!v.cust || String(o.partner_name || "").toLowerCase().includes(v.cust)));
       const reps = {};
       const key = o => String(o.user_id != null ? o.user_id : (o.salesperson || "—"));
-      conf.forEach(o => {
-        const k = key(o); const d = String(o.date_order || o.create_date).slice(0, 10); const v2 = val(o);
+      list.forEach(o => {
+        const k = key(o); const d = o.date; const v2 = o.value;
         const r = reps[k] || (reps[k] = { key: k, salesperson: o.salesperson || "—", user_id: o.user_id,
           weekly: weeks.map(() => 0), thisWeek: 0, lastWeek: 0, thisMonth: 0, lastMonth: 0,
           thisWeekN: 0, lastWeekN: 0, thisMonthN: 0, lastMonthN: 0, rangeOrders: 0, rangeValue: 0 });
@@ -144,7 +171,7 @@
       const top = reps[0];
       document.getElementById("kpis").innerHTML =
         kpi("k-vio", D.t("sp_reps"), D.fmtNum(reps.length), `${from} → ${to}`) +
-        kpi("k-grn", D.t("ov_confirmed"), D.fmtNum(rangeOrders), `${D.t("kpi_value")}: <b>${D.fmtMoney(rangeValue)}</b>`) +
+        kpi("k-grn", basis === "inv" ? D.t("invoices_w") : D.t("ov_confirmed"), D.fmtNum(rangeOrders), `${D.t("kpi_value")}: <b>${D.fmtMoney(rangeValue)}</b>`) +
         kpi("", D.t("kpi_value"), D.fmtMoney(rangeValue), "&nbsp;") +
         kpi("", D.t("col_rep"), top ? D.esc(top.salesperson) : "—", top ? D.fmtMoney(top.rangeValue) : "&nbsp;");
 
@@ -172,10 +199,10 @@
             </div>
           </div>
           <div class="rep-stats">
-            <div class="rep-stat"><div class="v">${D.fmtMoney(r.thisWeek)}</div><div class="l">${D.t("sp_week")} · ${D.fmtNum(r.thisWeekN)} ${D.t("orders")}</div></div>
-            <div class="rep-stat"><div class="v">${D.fmtMoney(r.lastWeek)}</div><div class="l">${D.t("last_week")} · ${D.fmtNum(r.lastWeekN)} ${D.t("orders")}</div></div>
-            <div class="rep-stat"><div class="v">${D.fmtMoney(r.thisMonth)}</div><div class="l">${D.t("sp_month")} · ${D.fmtNum(r.thisMonthN)} ${D.t("orders")}</div></div>
-            <div class="rep-stat"><div class="v">${D.fmtMoney(r.lastMonth)}</div><div class="l">${D.t("coll_last_month")} · ${D.fmtNum(r.lastMonthN)} ${D.t("orders")}</div></div>
+            <div class="rep-stat"><div class="v">${D.fmtMoney(r.thisWeek)}</div><div class="l">${D.t("sp_week")} · ${D.fmtNum(r.thisWeekN)} ${countLabel()}</div></div>
+            <div class="rep-stat"><div class="v">${D.fmtMoney(r.lastWeek)}</div><div class="l">${D.t("last_week")} · ${D.fmtNum(r.lastWeekN)} ${countLabel()}</div></div>
+            <div class="rep-stat"><div class="v">${D.fmtMoney(r.thisMonth)}</div><div class="l">${D.t("sp_month")} · ${D.fmtNum(r.thisMonthN)} ${countLabel()}</div></div>
+            <div class="rep-stat"><div class="v">${D.fmtMoney(r.lastMonth)}</div><div class="l">${D.t("coll_last_month")} · ${D.fmtNum(r.lastMonthN)} ${countLabel()}</div></div>
           </div>
           <div class="spark"><canvas id="spark_${i}"></canvas></div>
         </div>`).join("") : `<div class="empty">${D.t("no_data")}</div>`;
@@ -190,6 +217,12 @@
         });
       });
     }
+
+    basisSel.addEventListener("change", async () => {
+      basis = basisSel.value; localStorage.setItem("sales_basis", basis); setSub();
+      const wFrom = [monthStart, seriesStart, lastMonthStart].sort()[0];
+      await loadWindow(wFrom, today); render();
+    });
 
     (async function init() { const wFrom = [monthStart, seriesStart, lastMonthStart].sort()[0]; await loadWindow(wFrom, today); render(); })();
     setInterval(async () => { await loadWindow(loadedFrom || seriesStart, loadedTo || today); render(); }, D.cfg.POLL_MS * 5);
