@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-07-20 — Regions invoice basis nets credit notes: Gross + Net (v64)
+
+- Diagnosed the ~1% invoice-basis gap vs Odoo: our page showed positive
+  invoices only; Odoo's Invoices-by-State screen **nets credit notes**
+  (RINv/, ~87 in July). More documents, less money — exactly the gap.
+- **n8n invoice sync now captures credit notes**: both workflows fetch
+  `credit` and store `amount_total = debit − credit`, so credit notes
+  carry their NEGATIVE total (regular invoices unchanged, credit = 0).
+  The incremental was regenerated (it had been cleaned from Downloads);
+  **both must be re-imported** or the next run zeroes credit notes again.
+- **Regions invoice basis shows BOTH**: Gross (invoices only) and Net
+  (after credit notes = Odoo's total), as two money columns; the chart
+  plots Net so it lines up with Odoo. Orders basis unchanged.
+- Rollout: re-import both invoice workflows, run the BACKFILL once (signs
+  existing credit notes), then Net matches Odoo's screen to the dinar.
+- Cache-bust v=64.
+
 ## 2026-07-20 — Salespeople (WoW): Orders ⇄ Invoices basis toggle (v63)
 
 - Added the same basis toggle to the Salespeople page: each rep's
