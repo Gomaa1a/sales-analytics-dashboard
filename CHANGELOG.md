@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-07-20 — Cities page: Orders ⇄ Invoices basis toggle (v62)
+
+- The boss's regional reference is the INVOICE view (Accounting →
+  Invoices by State); the page showed ORDERS. Added a **basis toggle** at
+  the top — "أساس: الطلبات / الفواتير" — persisted per browser.
+  - **Orders** (unchanged): confirmed sale orders by order date.
+  - **Invoices** (new): posted INV/ documents by invoice date, tax-incl,
+    joined to the customer master for State/City — the twin of Odoo's
+    Invoices-grouped-by-State screen. Verified: 10/16 governorates match
+    to the dinar today; the 6 high ones are stale/ghost invoices (no
+    invoice reconcile yet — owner deferred).
+- Count column + None banner + basis note all switch with the toggle;
+  labels stay verbatim (State/City), None = Odoo's None row.
+- Cache-bust v=62.
+
 ## 2026-07-18 — Cities & Governorates in ODOO-EXACT mode (v59)
 
 - Owner decision: the Regions page must read like Odoo's own State
