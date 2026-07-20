@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-07-20 — Salespeople (WoW): Orders ⇄ Invoices basis toggle (v63)
+
+- Added the same basis toggle to the Salespeople page: each rep's
+  week-over-week / month-over-month, the comparison chart, the sparklines,
+  the KPIs and the per-card counts now compute on **Orders** (confirmed
+  sale orders by order date) OR **Invoices** (posted INV documents by
+  invoice date, per the invoice's salesperson). Persisted per browser.
+- Loader normalizes both bases into one `items` shape, so the buckets and
+  the uid-aware rep/customer filtering are identical either way. Count/KPI
+  labels and the 🔍 verify hint switch with the toggle (invoice mode →
+  Customer Invoices grouped by Salesperson).
+- Cache-bust v=63.
+
 ## 2026-07-20 — Cities page: Orders ⇄ Invoices basis toggle (v62)
 
 - The boss's regional reference is the INVOICE view (Accounting →
