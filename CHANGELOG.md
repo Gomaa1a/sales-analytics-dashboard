@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-07-20 — Cities invoice basis: Sales / Returns / Net as separate columns (v65)
+
+- Owner feedback: netting sales + returns into one "Net" figure was
+  confusing to reviewers even though correct. Now the invoice basis keeps
+  the two document types **separate**:
+  - **فواتير المبيعات (Sales invoices)** — the primary figure (positive
+    INV/ only); the governorate chart plots this.
+  - **المرتجعات (Returns)** — its own column (credit notes RINv/, red/
+    negative) — a standalone بند, never blended in.
+  - **الصافي (Net = Sales − Returns)** — kept and labeled, so anyone
+    comparing Odoo's combined Invoices-by-State screen still reconciles.
+- Basis note rewritten: sales and returns are separate document types;
+  Net is their combination = Odoo. Verified Baghdad July: Sales 352.42M
+  (921) · Returns −2.88M (36) · Net 349.54M (Net ↔ Odoo Posted 349.66M).
+- Cache-bust v=65.
+
 ## 2026-07-20 — Regions invoice basis nets credit notes: Gross + Net (v64)
 
 - Diagnosed the ~1% invoice-basis gap vs Odoo: our page showed positive
