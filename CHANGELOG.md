@@ -1,5 +1,35 @@
 # Changelog
 
+## 2026-07-23 — Freshness becomes a live countdown clock (v67–v68)
+
+- Moved the indicator next to the **LIVE** badge (it was clipped off the
+  right edge after the logout button) — v67.
+- Turned it into a **self-ticking countdown** that needs no page refresh — v68.
+  Shows `Synced from Odoo HH:MM · next in MM:SS`, counting down to the next
+  expected sync (pipelines fire every 20 min). A 1-second `setInterval`
+  repaints the clock; when it reaches 0 it force-polls the DB (bypassing the
+  60s cache) until the new sync lands, then resets itself. Still goes amber
+  past ~45 min. One interval per page, no network cost per tick.
+
+## 2026-07-22 — Header shows real "Synced from Odoo" time (v66)
+
+- The header's timestamp used to show `generated_at` — the browser's poll
+  time — which could be 20 min newer than the actual data and gave false
+  confidence. Replaced with the **true last-sync-from-Odoo** time on every
+  page.
+- Source: `max(updated_at)` across the three 20-min pipelines
+  (`dashboard_orders`, `dashboard_payments`, `dashboard_invoices`). Every
+  n8n upsert stamps `updated_at`, so this is the real "data as of" moment.
+  `dashboard_customers` is excluded — it's a 2-hour master sync and would
+  falsely make sales numbers look stale. Three tiny `limit=1` reads,
+  cached 60s; RLS-blocked/errored tables count as 0.
+- **Stale warning**: if the freshest sync is older than ~45 min (pipelines
+  run every 20 min, so that signals a stall), the line turns amber with a
+  "sync may be delayed — check n8n" hint.
+- No n8n changes, no new tables, no webhook (live-trigger idea was dropped
+  by owner in favour of freshness-only). `common.js` + i18n only.
+- Cache-bust v=66.
+
 ## 2026-07-20 — Cities invoice basis: Sales / Returns / Net as separate columns (v65)
 
 - Owner feedback: netting sales + returns into one "Net" figure was
