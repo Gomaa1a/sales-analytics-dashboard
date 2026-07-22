@@ -1349,13 +1349,13 @@
         </nav>
         <div class="hd-tools">
           <span class="live-dot"><i></i>${t("live")}</span>
+          <span id="updatedAt" class="updated" style="white-space:nowrap"></span>
           <button id="refreshBtn" class="icon-btn" type="button" title="${t("refresh_btn")}">🔄</button>
           <button id="soundBtn" class="icon-btn" type="button"></button>
           <button id="pdfBtn" class="icon-btn" type="button" title="${t("export_pdf")}">🖨️</button>
           <button id="langBtn" class="icon-btn lang" type="button">${t("lang_btn")}</button>
           ${prof ? `<span class="user-chip" title="${esc(prof.username)}">👤 ${esc(prof.full_name || prof.username)}</span>
           <button id="logoutBtn" class="icon-btn" type="button" title="${t("logout")}">⏻</button>` : ""}
-          <span id="updatedAt" class="updated"></span>
         </div>`;
       document.getElementById("langBtn").addEventListener("click", () => {
         LANG = isAR() ? "en" : "ar";
