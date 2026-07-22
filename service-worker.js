@@ -8,7 +8,7 @@
      - Same-origin app shell   -> network-first, cache fallback (offline).
      - CDN assets (Chart.js)   -> cache-first (URLs are versioned).
    ============================================================ */
-const VERSION = "v68";
+const VERSION = "v69";
 const CACHE = "dabboos-" + VERSION;
 
 self.addEventListener("install", () => {
