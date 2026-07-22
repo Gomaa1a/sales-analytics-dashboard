@@ -32,6 +32,8 @@
       odoo_synced: "آخر مزامنة من أودو",
       min_ago_tpl: "منذ {n} دقيقة",
       just_now: "الآن",
+      next_sync: "التالية خلال",
+      sync_checking: "جارٍ التحقق…",
       sync_delayed: "قد تكون المزامنة متأخرة — تحقّق من n8n",
       loading: "جارٍ التحميل…",
       error_load: "تعذّر تحميل البيانات من Supabase. تحقّق من الاتصال أو من إعدادات config.js.",
@@ -362,6 +364,8 @@
       odoo_synced: "Synced from Odoo",
       min_ago_tpl: "{n} min ago",
       just_now: "just now",
+      next_sync: "next in",
+      sync_checking: "checking…",
       sync_delayed: "Sync may be delayed — check n8n",
       loading: "Loading…",
       error_load: "Could not load data from Supabase. Check your connection or config.js.",
@@ -786,8 +790,8 @@
   // stale. Errors/RLS-blocked tables count as 0 (we use whatever the caller can
   // read). Cached 60s so the header poll is nearly free.
   let _syncCache = { at: 0, val: null };
-  async function loadLastSync() {
-    if (Date.now() - _syncCache.at < 60000) return _syncCache.val;
+  async function loadLastSync(force) {
+    if (!force && Date.now() - _syncCache.at < 60000) return _syncCache.val;
     const tables = ["dashboard_orders", "dashboard_payments", "dashboard_invoices"];
     const times = await Promise.all(tables.map(async tbl => {
       try {
@@ -1377,22 +1381,47 @@
     applyDataSourceVisibility();
   }
 
-  // Show when n8n last pulled from Odoo (NOT the browser's poll time — that was
-  // misleading). Repurposes the #updatedAt slot. The `ts` arg is ignored; the
-  // true value comes from loadLastSync(). Turns amber past ~45 min (pipelines
-  // run every 20 min, so that means a sync likely stalled — check n8n).
-  async function setUpdated(_ts) {
+  // Live "synced from Odoo" clock in the header. Pipelines fire every 20 min,
+  // so we count DOWN to the next expected sync and tick every second — the page
+  // never has to be refreshed. When the countdown runs out we poll the DB
+  // (forced, bypassing the 60s cache) until the new sync lands, then the clock
+  // resets itself. Past ~45 min with no sync it turns amber (likely stalled
+  // pipeline — check n8n). The `_ts` arg from callers is ignored on purpose;
+  // the browser's poll time was misleading, the real value is loadLastSync().
+  const SYNC_EVERY_MS = 20 * 60 * 1000;
+  let _syncTick = null, _syncLastMs = 0, _syncNextFetch = 0;
+
+  async function _syncRefetch(force) {
+    try { const ts = await loadLastSync(force); _syncLastMs = ts ? new Date(ts).getTime() : 0; } catch (e) {}
+    _syncNextFetch = Date.now() + (force ? 15000 : 45000);
+  }
+  function _clk(ms) {
+    const s = Math.max(0, Math.floor(ms / 1000));
+    return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+  }
+  function _paintSync() {
     const el = document.getElementById("updatedAt");
     if (!el) return;
-    let ts = null;
-    try { ts = await loadLastSync(); } catch (e) {}
-    if (!ts) { el.textContent = ""; el.removeAttribute("title"); el.style.color = ""; return; }
-    const ageMin = Math.max(0, Math.round((Date.now() - new Date(ts).getTime()) / 60000));
-    const stale = ageMin > 45;
-    const ago = ageMin === 0 ? t("just_now") : t("min_ago_tpl").replace("{n}", ageMin);
-    el.textContent = (stale ? "⚠ " : "") + t("odoo_synced") + ": " + fmtTime(ts) + " · " + ago;
+    if (!_syncLastMs) { el.textContent = ""; el.removeAttribute("title"); el.style.color = ""; return; }
+    const now = Date.now();
+    const stale = now - _syncLastMs > 45 * 60000;
+    const remain = (_syncLastMs + SYNC_EVERY_MS) - now;
+    const tail = remain > 0 ? (t("next_sync") + " " + _clk(remain)) : t("sync_checking");
+    el.textContent = (stale ? "⚠ " : "") + t("odoo_synced") + " " +
+      fmtTime(new Date(_syncLastMs).toISOString()) + " · " + tail;
     el.style.color = stale ? "#f0a020" : "";
     if (stale) el.title = t("sync_delayed"); else el.removeAttribute("title");
+    if (remain <= 0 && now >= _syncNextFetch) _syncRefetch(true); // overdue → poll hard for the new sync
+  }
+  // Pages call setUpdated() on each poll; it just ensures the self-running clock
+  // is started (idempotent — one interval per page, ticks every second).
+  function setUpdated() {
+    if (_syncTick) return;
+    _syncRefetch(false).then(_paintSync);
+    _syncTick = setInterval(() => {
+      if (Date.now() >= _syncNextFetch) _syncRefetch(false);
+      _paintSync();
+    }, 1000);
   }
 
   function stateLabel(s) { return (I18N[LANG].states[s]) || s || "—"; }
