@@ -29,6 +29,10 @@
       lang_btn: "EN",
       live: "مباشر",
       updated: "آخر تحديث",
+      odoo_synced: "آخر مزامنة من أودو",
+      min_ago_tpl: "منذ {n} دقيقة",
+      just_now: "الآن",
+      sync_delayed: "قد تكون المزامنة متأخرة — تحقّق من n8n",
       loading: "جارٍ التحميل…",
       error_load: "تعذّر تحميل البيانات من Supabase. تحقّق من الاتصال أو من إعدادات config.js.",
       // overview
@@ -355,6 +359,10 @@
       lang_btn: "ع",
       live: "LIVE",
       updated: "Updated",
+      odoo_synced: "Synced from Odoo",
+      min_ago_tpl: "{n} min ago",
+      just_now: "just now",
+      sync_delayed: "Sync may be delayed — check n8n",
       loading: "Loading…",
       error_load: "Could not load data from Supabase. Check your connection or config.js.",
       kpi_quotes: "Quotations this month",
@@ -769,6 +777,27 @@
     });
     if (!res.ok) { authFail(res); throw new Error("Supabase HTTP " + res.status); }
     return res.status === 204 ? null : res.json();
+  }
+
+  // Freshness — the real moment n8n last pulled from Odoo. Every upsert stamps
+  // updated_at, so max(updated_at) across the three 20-min pipelines (orders,
+  // payments, invoices) is the true "data as of" time. dashboard_customers is a
+  // 2-hour master sync — excluded so it never makes the sales numbers look
+  // stale. Errors/RLS-blocked tables count as 0 (we use whatever the caller can
+  // read). Cached 60s so the header poll is nearly free.
+  let _syncCache = { at: 0, val: null };
+  async function loadLastSync() {
+    if (Date.now() - _syncCache.at < 60000) return _syncCache.val;
+    const tables = ["dashboard_orders", "dashboard_payments", "dashboard_invoices"];
+    const times = await Promise.all(tables.map(async tbl => {
+      try {
+        const r = await sbGet(`${tbl}?select=updated_at&order=updated_at.desc&limit=1`);
+        return (r && r[0] && r[0].updated_at) ? new Date(r[0].updated_at).getTime() : 0;
+      } catch (e) { return 0; }
+    }));
+    const max = Math.max(0, ...times);
+    _syncCache = { at: Date.now(), val: max > 0 ? new Date(max).toISOString() : null };
+    return _syncCache.val;
   }
 
   /* ---------------- data-source visibility (admin-controlled, GLOBAL) ----------------
@@ -1342,14 +1371,28 @@
       const lo = document.getElementById("logoutBtn");
       if (lo) lo.addEventListener("click", () => window.DASH_AUTH.signOut());
       renderSoundBtn();
+      setUpdated(); // paint "synced from Odoo" now; pages refresh it on each poll
     }
     // hide any panels whose source table an admin has switched off (global)
     applyDataSourceVisibility();
   }
 
-  function setUpdated(ts) {
+  // Show when n8n last pulled from Odoo (NOT the browser's poll time — that was
+  // misleading). Repurposes the #updatedAt slot. The `ts` arg is ignored; the
+  // true value comes from loadLastSync(). Turns amber past ~45 min (pipelines
+  // run every 20 min, so that means a sync likely stalled — check n8n).
+  async function setUpdated(_ts) {
     const el = document.getElementById("updatedAt");
-    if (el) el.textContent = t("updated") + ": " + fmtTime(ts);
+    if (!el) return;
+    let ts = null;
+    try { ts = await loadLastSync(); } catch (e) {}
+    if (!ts) { el.textContent = ""; el.removeAttribute("title"); el.style.color = ""; return; }
+    const ageMin = Math.max(0, Math.round((Date.now() - new Date(ts).getTime()) / 60000));
+    const stale = ageMin > 45;
+    const ago = ageMin === 0 ? t("just_now") : t("min_ago_tpl").replace("{n}", ageMin);
+    el.textContent = (stale ? "⚠ " : "") + t("odoo_synced") + ": " + fmtTime(ts) + " · " + ago;
+    el.style.color = stale ? "#f0a020" : "";
+    if (stale) el.title = t("sync_delayed"); else el.removeAttribute("title");
   }
 
   function stateLabel(s) { return (I18N[LANG].states[s]) || s || "—"; }
@@ -1701,7 +1744,7 @@
   window.DASH = {
     t, isAR, lang: () => LANG, esc,
     fmtNum, fmtMoney, fmtMoneyFull, fmtDate, fmtTime,
-    api, ackAlert, beep, toast, notify, buildChrome, setUpdated, renderSoundBtn,
+    api, ackAlert, beep, toast, notify, buildChrome, setUpdated, loadLastSync, renderSoundBtn,
     stateLabel, trustLabel, filterBar,
     govOf, govLabel, GOV, loadOrders, loadPayments, loadSalespeopleMaster, sbGetAll, sbGet, sbWrite, nextDay, bagDay, addDays, weekStartSat,
     DATA_SOURCES, loadHiddenSources, setHiddenSources, applyDataSourceVisibility, applyHidden,
