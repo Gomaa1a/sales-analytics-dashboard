@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dabboos — Products & Warehouse</title>
+  <link rel="stylesheet" href="assets/css/style.css?v=70" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#0f1729" />
+  <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📦</text></svg>" />
+</head>
+<body>
+  <header id="appHeader" class="app"></header>
+  <main class="wrap">
+    <div class="page-head">
+      <h1 id="pgTitle"></h1>
+      <p id="pgSub"></p>
+    </div>
+
+    <p id="partialWarn" class="muted" style="margin:-4px 2px 10px;font-size:12px;line-height:1.6;color:#f0a020"></p>
+
+    <div id="kpiRow" class="kpi-grid" data-src="dashboard_stock dashboard_order_lines"></div>
+
+    <!-- ===== Section A: Frozen ===== -->
+    <div class="panel" data-src="dashboard_stock dashboard_products">
+      <div class="panel-head">
+        <h2 id="frozenTitle"></h2>
+        <div class="filters" id="thrPills" style="margin:0"></div>
+      </div>
+      <div class="panel-body">
+        <div class="chart-box" style="height:220px;margin-bottom:10px"><canvas id="frozenChart"></canvas></div>
+        <div id="frozenTable"></div>
+        <p id="chkFrozen" class="muted" style="font-size:11px;margin:8px 2px 0"></p>
+      </div>
+    </div>
+
+    <!-- ===== Section B: Hot ===== -->
+    <div class="panel" data-src="dashboard_order_lines" style="margin-top:14px">
+      <div class="panel-head"><h2 id="hotTitle"></h2></div>
+      <div class="panel-body">
+        <div class="filters">
+          <label class="fb-field"><span id="fromLbl"></span><input id="fFrom" class="fb-date" type="date"></label>
+          <label class="fb-field"><span id="toLbl"></span><input id="fTo" class="fb-date" type="date"></label>
+          <select id="metricSel" class="fb-sel"></select>
+        </div>
+        <div class="grid-2">
+          <div class="chart-box tall"><canvas id="hotChart"></canvas></div>
+          <div id="hotTable"></div>
+        </div>
+        <div id="drillPanel" style="display:none;margin-top:12px"></div>
+        <p id="chkHot" class="muted" style="font-size:11px;margin:8px 2px 0"></p>
+      </div>
+    </div>
+
+    <div class="foot">Dabboos Sales Command Center · n8n + Odoo</div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="assets/js/config.js?v=70"></script>
+  <script src="assets/js/auth.js?v=70"></script>
+  <script src="assets/js/common.js?v=70"></script>
+  <script src="assets/js/products-calc.js?v=70"></script>
+  <script>
+  (function () {
+    const D = window.DASH, P = window.DASH_PRODUCTS;
+    const $ = id => document.getElementById(id);
+    D.buildChrome("products");
+    $("pgTitle").textContent = D.t("prod_title");
+    $("pgSub").textContent = D.t("prod_sub");
+    $("frozenTitle").textContent = D.t("prod_frozen_title");
+    $("hotTitle").textContent = D.t("prod_hot_title");
+    $("chkFrozen").textContent = D.t("chk_frozen");
+    $("chkHot").textContent = D.t("chk_hot");
+    $("fromLbl").textContent = D.t("f_from") + " ";
+    $("toLbl").textContent = " " + D.t("f_to") + " ";
+
+    let threshold = 60, metric = "revenue";
+    let products = [], stockById = {}, costById = {}, nameById = {}, custName = {}, lines = [];
+    let frozenChart = null, hotChart = null;
+
+    // threshold pills
+    $("thrPills").innerHTML = [30, 60, 90].map(d =>
+      `<span class="pill ${d === threshold ? "active" : ""}" data-d="${d}">${d} ${D.t("prod_days")}</span>`).join("");
+    $("thrPills").querySelectorAll(".pill").forEach(p => p.addEventListener("click", () => {
+      threshold = Number(p.getAttribute("data-d"));
+      $("thrPills").querySelectorAll(".pill").forEach(x => x.classList.toggle("active", x === p));
+      renderFrozen();
+    }));
+    // metric select (revenue / units)
+    $("metricSel").innerHTML =
+      `<option value="revenue">${D.t("prod_by_revenue")}</option><option value="units">${D.t("prod_by_units")}</option>`;
+    $("metricSel").addEventListener("change", () => { metric = $("metricSel").value; renderHot(); });
+
+    // date defaults: current month
+    const today = D.bagDay(new Date());
+    $("fFrom").value = today.slice(0, 7) + "-01";
+    $("fTo").value = today;
+    $("fFrom").addEventListener("change", renderHot);
+    $("fTo").addEventListener("change", renderHot);
+
+    const fmt = D.fmtMoney, esc = D.esc, num = n => Number(n) || 0;
+
+    function lastSaleMap() {
+      const m = {};
+      for (const l of lines) {
+        const t = l.date_order ? new Date(l.date_order).getTime() : 0;
+        if (!t) continue;
+        if (!m[l.product_id] || t > new Date(m[l.product_id]).getTime()) m[l.product_id] = l.date_order;
+      }
+      return m;
+    }
+
+    function renderKpis(frozen) {
+      const totalVal = Object.values(stockById).reduce((a, s) => a + num(s.stock_value), 0);
+      const frozenVal = frozen.reduce((a, r) => a + num(r.stock_value), 0);
+      const pct = totalVal ? Math.round(frozenVal / totalVal * 100) : 0;
+      // top seller in the current hot window
+      const agg = P.aggregateLines(hotLines(), costById);
+      const top = agg.byProduct[0];
+      const topName = top ? (nameById[top.product_id] || ("#" + top.product_id)) : "—";
+      const kpi = (cls, label, val, sub) =>
+        `<div class="kpi ${cls}"><div class="kpi-l">${label}</div><div class="kpi-n">${val}</div><div class="kpi-sub">${sub || "&nbsp;"}</div></div>`;
+      $("kpiRow").innerHTML =
+        kpi("", D.t("prod_kpi_stockval"), fmt(totalVal), "&nbsp;") +
+        kpi("k-amb", D.t("prod_kpi_frozenval"), fmt(frozenVal), "&nbsp;") +
+        kpi("k-amb", D.t("prod_kpi_frozensku"), D.fmtNum(frozen.length), `${pct}% ${D.t("prod_kpi_frozenpct")}`) +
+        kpi("k-grn", D.t("prod_kpi_top"), esc(topName), top ? fmt(top.revenue) : "&nbsp;");
+    }
+
+    function renderFrozen() {
+      const now = Date.now();
+      const all = P.classifyFrozen(products, stockById, lastSaleMap(), threshold, now);
+      const frozen = all.filter(r => r.frozen).sort((a, b) => b.stock_value - a.stock_value);
+      renderKpis(frozen);
+
+      // category chart (frozen value by category)
+      const byCat = {};
+      frozen.forEach(r => { const c = r.category || "—"; byCat[c] = (byCat[c] || 0) + num(r.stock_value); });
+      const cats = Object.entries(byCat).sort((a, b) => b[1] - a[1]).slice(0, 10);
+      if (frozenChart) frozenChart.destroy();
+      frozenChart = new Chart($("frozenChart"), {
+        type: "bar",
+        data: { labels: cats.map(c => c[0]), datasets: [{ data: cats.map(c => c[1]), backgroundColor: "#f0a020" }] },
+        options: { indexAxis: "y", plugins: { legend: { display: false } },
+          scales: { x: { ticks: { callback: v => fmt(v) } } }, responsive: true, maintainAspectRatio: false }
+      });
+
+      // table
+      $("frozenTable").innerHTML = frozen.length ? `
+        <table class="dt"><thead><tr>
+          <th>${D.t("prod_th_product")}</th><th>${D.t("prod_th_category")}</th>
+          <th>${D.t("prod_th_onhand")}</th><th>${D.t("prod_th_value")}</th>
+          <th>${D.t("prod_th_lastsale")}</th><th>${D.t("prod_th_idle")}</th>
+          <th>${D.t("prod_th_velocity")}</th>
+        </tr></thead><tbody>
+        ${frozen.map(r => {
+          const vel = P.productVelocity(lines, r.product_id, 90, now);
+          return `<tr class="prod-row" data-pid="${esc(r.product_id)}" style="cursor:pointer">
+            <td>${esc(r.name || ("#" + r.product_id))}
+              ${r.never_sold ? `<span class="badge b-crit">${D.t("prod_never_sold")}</span>` : ""}</td>
+            <td class="muted">${esc(r.category || "—")}</td>
+            <td>${D.fmtNum(Math.round(r.on_hand_qty))}</td>
+            <td class="amt">${fmt(r.stock_value)}</td>
+            <td class="muted">${r.last_sale ? D.fmtDate(r.last_sale) : "—"}</td>
+            <td>${r.days_idle == null ? "—" : (r.days_idle + D.t("prod_days"))}</td>
+            <td class="muted">${vel ? vel.toFixed(1) : "0"}</td>
+          </tr>
+          <tr class="prod-detail" data-for="${esc(r.product_id)}" style="display:none"><td colspan="7"></td></tr>`;
+        }).join("")}
+        </tbody></table>` : `<div class="empty">${D.t("prod_no_frozen")}</div>`;
+
+      $("frozenTable").querySelectorAll(".prod-row").forEach(row => row.addEventListener("click", () => {
+        const pid = row.getAttribute("data-pid");
+        const det = $("frozenTable").querySelector(`.prod-detail[data-for="${pid}"]`);
+        if (!det) return;
+        if (det.style.display === "none") {
+          const mk = P.productMarkets(lines, isNaN(pid) ? pid : Number(pid));
+          det.querySelector("td").innerHTML = `<b>${D.t("prod_where_sells")}:</b> ` +
+            (mk.length ? mk.map(m => `${esc(m.gov)} (${D.fmtNum(Math.round(m.units))})`).join(" · ")
+                       : `<span class="muted">${D.t("prod_no_lines")}</span>`);
+          det.style.display = "";
+        } else det.style.display = "none";
+      }));
+    }
+
+    function hotLines() {
+      const from = $("fFrom").value, to = D.nextDay($("fTo").value);
+      return lines.filter(l => l.date_order && l.date_order.slice(0, 10) >= from && l.date_order.slice(0, 10) < to);
+    }
+
+    function renderHot() {
+      const hl = hotLines();
+      const agg = P.aggregateLines(hl, costById);
+      const top = agg.byProduct.slice(0, 15);
+      renderKpis(P.classifyFrozen(products, stockById, lastSaleMap(), threshold, Date.now()).filter(r => r.frozen));
+
+      if (hotChart) hotChart.destroy();
+      hotChart = new Chart($("hotChart"), {
+        type: "bar",
+        data: { labels: top.map(r => nameById[r.product_id] || ("#" + r.product_id)),
+          datasets: [{ data: top.map(r => metric === "units" ? r.units : r.revenue), backgroundColor: "#2563eb" }] },
+        options: { indexAxis: "y", plugins: { legend: { display: false } },
+          scales: { x: { ticks: { callback: v => metric === "units" ? D.fmtNum(v) : fmt(v) } } },
+          responsive: true, maintainAspectRatio: false }
+      });
+
+      $("hotTable").innerHTML = top.length ? `
+        <table class="dt"><thead><tr>
+          <th>${D.t("prod_th_product")}</th><th>${D.t("prod_th_units")}</th>
+          <th>${D.t("prod_th_revenue")}</th><th>${D.t("prod_th_margin")}</th><th>${D.t("prod_th_mix")}</th>
+        </tr></thead><tbody>
+        ${top.map(r => `<tr class="hot-row" data-pid="${esc(r.product_id)}" style="cursor:pointer">
+          <td>${esc(nameById[r.product_id] || ("#" + r.product_id))}</td>
+          <td>${D.fmtNum(Math.round(r.units))}</td>
+          <td class="amt">${fmt(r.revenue)}</td>
+          <td class="amt">${fmt(r.margin)}</td>
+          <td class="muted">${r.mix_pct.toFixed(1)}%</td>
+        </tr>`).join("")}
+        </tbody></table>` : `<div class="empty">${D.t("prod_no_lines")}</div>`;
+
+      $("hotTable").querySelectorAll(".hot-row").forEach(row => row.addEventListener("click", () => {
+        const pid = row.getAttribute("data-pid");
+        const d = agg.drill(isNaN(pid) ? pid : Number(pid));
+        const list = (title, rows, labelFn) => `<div class="panel" style="margin:0">
+          <div class="panel-head"><h2 style="font-size:14px">${title}</h2></div>
+          <div class="panel-body" style="padding:0"><table class="dt"><tbody>
+          ${rows.slice(0, 10).map(x => `<tr><td>${esc(labelFn(x))}</td>
+            <td>${D.fmtNum(Math.round(x.units))}</td><td class="amt">${fmt(x.revenue)}</td></tr>`).join("")}
+          </tbody></table></div></div>`;
+        $("drillPanel").innerHTML = `<div class="grid-2">
+          ${list(D.t("prod_top_customers"), d.byCustomer, x => custName[x.partner_id] || ("#" + x.partner_id))}
+          ${list(D.t("prod_top_cities"), d.byGov, x => x.gov)}
+        </div>`;
+        $("drillPanel").style.display = "";
+      }));
+    }
+
+    async function tick() {
+      try {
+        const from180 = (() => { const d = new Date(today + "T00:00:00"); d.setDate(d.getDate() - 180); return d.toISOString().slice(0, 10); })();
+        const [prd, stk, ln, cst] = await Promise.all([
+          D.sbGetAll("dashboard_products?select=product_id,name,category,brand,cost&order=product_id.desc"),
+          D.sbGetAll("dashboard_stock?select=product_id,on_hand_qty,stock_value&order=product_id.desc"),
+          D.sbGetAll(`dashboard_order_lines?select=line_id,product_id,qty,price_subtotal,date_order,partner_id,city,gov&state=in.(sale,done)&date_order=gte.${from180}&order=line_id.desc`),
+          D.sbGetAll("dashboard_customers?select=partner_id,complete_name&order=partner_id.desc")
+        ]);
+        products = prd || [];
+        lines = ln || [];
+        stockById = {}; costById = {}; nameById = {}; custName = {};
+        (stk || []).forEach(s => { stockById[s.product_id] = s; });
+        products.forEach(p => { costById[p.product_id] = num(p.cost); nameById[p.product_id] = p.name; });
+        (cst || []).forEach(c => { custName[c.partner_id] = c.complete_name; });
+
+        const partial = lines.length < 500 || products.length === 0;
+        $("partialWarn").textContent = partial ? D.t("prod_warn_partial") : "";
+        D.setUpdated();
+        renderFrozen();
+        renderHot();
+      } catch (e) {
+        $("frozenTable").innerHTML = `<div class="err">${D.t("error_load")}</div>`;
+      }
+    }
+    tick();
+    setInterval(tick, D.cfg.POLL_MS);
+  })();
+  </script>
+</body>
+</html>

@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-07-23 — Products & Warehouse page (v70)
+
+- New page `products.html` (nav under "sales", role-gated via auth.js):
+  - **Frozen stock** — products in stock with no sale within a tunable
+    30/60/90-day window; table sorted by capital-at-risk, category chart,
+    expandable "where it sells", KPI tiles (stock value · frozen value · %).
+  - **Hot products** — top sellers for a date window (default this month),
+    revenue/units toggle, click-to-drill into top customers + top cities,
+    gross-margin column (cost from `standard_price`).
+- Pure analytics live in `assets/js/products-calc.js` (dual browser/Node,
+  unit-tested in `test/products.test.js`): classifyFrozen, productVelocity,
+  productMarkets, lineMargin, aggregateLines.
+- Data from three new tables (`dashboard_products`, `dashboard_stock`,
+  `dashboard_order_lines`) fed by new n8n syncs; `supabase/products-warehouse.sql`.
+- 🔍 Odoo-verify lines on both sections. Cache-bust v70.
+
 ## 2026-07-23 — Freshness becomes a live countdown clock (v67–v68)
 
 - Moved the indicator next to the **LIVE** badge (it was clipped off the

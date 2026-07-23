@@ -18,16 +18,17 @@
   const EMAIL_DOMAIN = "dabboos.app";
 
   /* ------------- pages & role defaults ------------- */
-  const PAGE_ORDER = ["overview", "regions", "sales", "collections", "debt", "alerts", "admin"];
+  const PAGE_ORDER = ["overview", "regions", "sales", "products", "collections", "debt", "alerts", "admin"];
   const FILE_OF = {
     overview: "index.html", regions: "regions.html", sales: "salespeople.html",
+    products: "products.html",
     collections: "collections.html", debt: "debt.html", alerts: "alerts.html", admin: "admin.html"
   };
   // A user's `pages` jsonb overrides these per key; missing keys fall back here.
   const ROLE_DEFAULTS = {
-    admin:      { overview: true,  regions: true,  sales: true,  collections: true,  debt: true,  alerts: true, admin: true  },
-    management: { overview: true,  regions: true,  sales: true,  collections: true,  debt: true,  alerts: true, admin: false },
-    alerts:     { overview: false, regions: false, sales: false, collections: false, debt: false, alerts: true, admin: false }
+    admin:      { overview: true,  regions: true,  sales: true,  products: true,  collections: true,  debt: true,  alerts: true, admin: true  },
+    management: { overview: true,  regions: true,  sales: true,  products: true,  collections: true,  debt: true,  alerts: true, admin: false },
+    alerts:     { overview: false, regions: false, sales: false, products: false, collections: false, debt: false, alerts: true, admin: false }
   };
 
   function pageIdFromLocation() {
