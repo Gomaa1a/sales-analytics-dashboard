@@ -69,6 +69,14 @@
       prod_warn_partial: "⚠️ بيانات المبيعات جزئية حالياً — قائمة «المجمّد» ستكون دقيقة بعد اكتمال تحميل الأشهر.",
       chk_frozen: "🔍 قارن في أودو: المخزون (المتوفر) + تحليل المبيعات حسب المنتج (آخر بيع)",
       chk_hot: "🔍 قارن في أودو: تحليل المبيعات حسب المنتج × العميل/المحافظة",
+      src_products: "المنتجات",
+      src_stock: "المخزون",
+      src_lines: "بنود المبيعات",
+      src_f_prod_catalog: "كتالوج المنتجات (الفئة/التكلفة)",
+      src_f_frozen: "المخزون المجمّد",
+      src_f_stockval: "قيمة المخزون",
+      src_f_hot: "الأكثر مبيعاً حسب العميل/المدينة",
+      src_f_lastsale: "آخر بيع لكل منتج",
       loading: "جارٍ التحميل…",
       error_load: "تعذّر تحميل البيانات من Supabase. تحقّق من الاتصال أو من إعدادات config.js.",
       // overview
@@ -452,6 +460,14 @@
       prod_warn_partial: "⚠️ Sales data is partial right now — the Frozen list becomes accurate once all months finish loading.",
       chk_frozen: "🔍 Check in Odoo: Inventory > Products (on-hand) + Sales Analysis by Product (last sale)",
       chk_hot: "🔍 Check in Odoo: Sales Analysis by Product × Customer/State",
+      src_products: "Products",
+      src_stock: "Stock",
+      src_lines: "Order lines",
+      src_f_prod_catalog: "Product catalog (category/cost)",
+      src_f_frozen: "Frozen stock",
+      src_f_stockval: "Stock value",
+      src_f_hot: "Top sellers by customer/city",
+      src_f_lastsale: "Last sale per product",
       loading: "Loading…",
       error_load: "Could not load data from Supabase. Check your connection or config.js.",
       kpi_quotes: "Quotations this month",
@@ -920,7 +936,10 @@
     { table: "dashboard_invoices",  key: "src_invoices",  feeds: ["src_f_inv_today", "src_f_inv_month", "src_f_debt"] },
     { table: "dashboard_payments",  key: "src_payments",  feeds: ["src_f_cash", "src_f_collections", "src_f_pay_tables"] },
     { table: "dashboard_orders",    key: "src_orders",    feeds: ["src_f_orders_today", "src_f_charts", "src_f_regions", "src_f_sales"] },
-    { table: "dashboard_customers", key: "src_customers", feeds: ["src_f_names", "src_f_geo"] }
+    { table: "dashboard_customers", key: "src_customers", feeds: ["src_f_names", "src_f_geo"] },
+    { table: "dashboard_products",    key: "src_products", feeds: ["src_f_prod_catalog"] },
+    { table: "dashboard_stock",       key: "src_stock",    feeds: ["src_f_frozen", "src_f_stockval"] },
+    { table: "dashboard_order_lines", key: "src_lines",    feeds: ["src_f_hot", "src_f_lastsale"] }
   ];
   const HIDDEN_SRC_LKEY = "dash_hidden_src";
   let _hiddenSrc = null; // cached Set of hidden table names
