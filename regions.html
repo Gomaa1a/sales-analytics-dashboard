@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Cities & Governorates</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=69" />
+  <link rel="stylesheet" href="assets/css/style.css?v=70" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -62,12 +62,25 @@
     </div>
 
     <div class="foot">Dabboos Sales Command Center · n8n + Odoo</div>
+
+    <div id="quietModal" class="modal-overlay">
+      <div class="modal" style="max-width:640px">
+        <div class="modal-head">
+          <div id="quietTitle" class="modal-title"></div>
+          <button id="quietClose" class="icon-btn" type="button">✕</button>
+        </div>
+        <div class="modal-body" style="padding:0 0 8px">
+          <p id="quietSub" class="muted" style="margin:12px 20px 8px;font-size:12px"></p>
+          <div id="quietBody" style="max-height:68vh;overflow:auto"></div>
+        </div>
+      </div>
+    </div>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=69"></script>
-  <script src="assets/js/auth.js?v=69"></script>
-  <script src="assets/js/common.js?v=69"></script>
+  <script src="assets/js/config.js?v=70"></script>
+  <script src="assets/js/auth.js?v=70"></script>
+  <script src="assets/js/common.js?v=70"></script>
   <script>
   (function () {
     const D = window.DASH;
@@ -125,6 +138,9 @@
     $("govSel").addEventListener("input", render);
     $("q").addEventListener("input", render);
     $("clr").addEventListener("click", () => { $("q").value = ""; $("govSel").value = ""; render(); });
+    $("quietClose").addEventListener("click", closeQuiet);
+    $("quietModal").addEventListener("click", e => { if (e.target === $("quietModal")) closeQuiet(); });
+    document.addEventListener("keydown", e => { if (e.key === "Escape") closeQuiet(); });
     basisSel.addEventListener("change", async () => {
       basis = basisSel.value; localStorage.setItem("regions_basis", basis); setBasisNote();
       const from = $("fFrom").value || from30, to = $("fTo").value || today;
@@ -181,7 +197,7 @@
       const prevTo = D.addDays(from, -1), prevFrom = D.addDays(from, -lenDays);
       const [rows, masterCounts] = await Promise.all([
         D.loadOrders({ from: prevFrom, to, dateField: "date_order",
-          select: "order_id,partner_id,city,state,amount_total,date_order,dashboard_customers(governorate,city)" }),
+          select: "order_id,partner_id,partner_name,salesperson,city,state,amount_total,date_order,dashboard_customers(governorate,city)" }),
         regionCustomerCounts()
       ]);
       const NONE = D.t("gov_none");
@@ -195,13 +211,21 @@
         const gov = (mc.governorate && String(mc.governorate).trim()) || NONE;
         const city = (mc.city && String(mc.city).trim()) || ((o.city && o.city !== "—") ? String(o.city).trim() : NONE);
         const key = gov + "||" + city, a = val(o);
-        const g = byGov[gov] || (byGov[gov] = { cur: 0, prev: 0, orders: 0, curPids: new Set(), prevPids: new Set() });
+        const g = byGov[gov] || (byGov[gov] = { cur: 0, prev: 0, orders: 0, curPids: new Set(), prevPids: new Set(), prevCust: new Map() });
         if (inCur) {
           g.cur += a; g.orders++; if (o.partner_id != null) g.curPids.add(o.partner_id);
           const cm = cityM[key] || (cityM[key] = { city, govKey: gov, govLabel: gov, orders: 0, value: 0, returns: 0, net: 0, prev: 0 });
           cm.orders++; cm.value += a; cm.net += a;
         } else {
-          g.prev += a; if (o.partner_id != null) g.prevPids.add(o.partner_id);
+          g.prev += a;
+          if (o.partner_id != null) {
+            g.prevPids.add(o.partner_id);
+            // remember each prev-period customer so the "quiet" list can name them
+            const pc = g.prevCust.get(o.partner_id) || { name: o.partner_name || ("ID " + o.partner_id), rep: o.salesperson || "", lastDate: "", total: 0 };
+            pc.total += a;
+            if (day > pc.lastDate) { pc.lastDate = day; if (o.salesperson) pc.rep = o.salesperson; }
+            g.prevCust.set(o.partner_id, pc);
+          }
           prevCity[key] = (prevCity[key] || 0) + a;
         }
       });
@@ -439,10 +463,34 @@
           <td class="strong" style="width:20%">${D.esc(r.label)}</td>
           <td style="width:38%"><div style="background:var(--bdr);border-radius:6px;height:14px;overflow:hidden"><div style="width:${pct}%;height:100%;background:var(--acc)"></div></div></td>
           <td class="muted" style="white-space:nowrap">${D.fmtNum(r.active)} ${D.t("rg_buyers_of")} ${D.fmtNum(r.total)}${r.gap > 0 ? ` · <b class="down">${D.fmtNum(r.gap)} ${D.t("rg_to_chase")}</b>` : ""}</td>
-          <td class="muted" style="white-space:nowrap">${r.quiet > 0 ? `⏸ ${D.fmtNum(r.quiet)} ${D.t("rg_quiet")}` : ""}</td>
+          <td class="muted" style="white-space:nowrap">${r.quiet > 0 ? `<a class="quiet-link" data-gov="${D.esc(r.label)}" title="${D.esc(D.t("rg_quiet_title"))}" style="cursor:pointer;color:var(--acc);text-decoration:underline dotted">⏸ ${D.fmtNum(r.quiet)} ${D.t("rg_quiet")}</a>` : ""}</td>
         </tr>`;
       }).join("") + `</tbody></table>`;
+      [...$("coverageBody").querySelectorAll(".quiet-link")].forEach(el => el.addEventListener("click", () => openQuiet(el.dataset.gov)));
     }
+
+    // drill-down: the customers who bought in the previous period but not this one,
+    // for one governorate — sorted by their previous-period value (biggest lost first).
+    function openQuiet(gov) {
+      const g = ordStory && ordStory.byGov && ordStory.byGov[gov];
+      if (!g || !g.prevCust) return;
+      const cur = g.curPids;
+      const list = [...g.prevCust.entries()].filter(([pid]) => !cur.has(pid)).map(([, v]) => v).sort((a, b) => b.total - a.total);
+      $("quietTitle").textContent = `${D.t("rg_quiet_title")} — ${gov} · ${D.fmtNum(list.length)}`;
+      $("quietSub").textContent = D.t("rg_quiet_modal_sub");
+      $("quietBody").innerHTML = list.length ? `
+        <table class="dt">
+          <thead><tr><th>${D.t("rg_col_customer")}</th><th>${D.t("rg_col_rep")}</th><th>${D.t("rg_col_lastorder")}</th><th>${D.t("col_amount")}</th></tr></thead>
+          <tbody>${list.map(v => `<tr>
+            <td class="strong">${D.esc(v.name)}</td>
+            <td class="muted">${D.esc(v.rep || "—")}</td>
+            <td class="muted">${D.esc(v.lastDate || "—")}</td>
+            <td class="amt">${D.fmtMoney(v.total)}</td>
+          </tr>`).join("")}</tbody>
+        </table>` : `<div class="empty">${D.t("no_data")}</div>`;
+      $("quietModal").classList.add("open");
+    }
+    function closeQuiet() { $("quietModal").classList.remove("open"); }
 
     (async function init() { await loadWindow(monthStart, today); fillGovSelect(); render(); })();
     setInterval(async () => { await loadWindow(loadedFrom || monthStart, loadedTo || today); fillGovSelect(); render(); }, D.cfg.POLL_MS * 5);
