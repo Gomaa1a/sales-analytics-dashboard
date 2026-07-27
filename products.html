@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Products & Warehouse</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=70" />
+  <link rel="stylesheet" href="assets/css/style.css?v=71" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -21,6 +21,16 @@
     </div>
 
     <p id="partialWarn" class="muted" style="margin:-4px 2px 10px;font-size:12px;line-height:1.6;color:#f0a020"></p>
+
+    <!-- global filters: salesperson · city · customer · period -->
+    <div class="filters" id="filterBar">
+      <select id="repSel" class="fb-sel"></select>
+      <select id="citySel" class="fb-sel"></select>
+      <input id="custSearch" class="search-box" type="search">
+      <label class="fb-field"><span id="fromLbl"></span><input id="fFrom" class="fb-date" type="date"></label>
+      <label class="fb-field"><span id="toLbl"></span><input id="fTo" class="fb-date" type="date"></label>
+      <button id="clrBtn" class="fb-clear" type="button">✕</button>
+    </div>
 
     <div id="kpiRow" class="kpi-grid" data-src="dashboard_stock dashboard_order_lines"></div>
 
@@ -39,13 +49,11 @@
 
     <!-- ===== Section B: Hot ===== -->
     <div class="panel" data-src="dashboard_order_lines" style="margin-top:14px">
-      <div class="panel-head"><h2 id="hotTitle"></h2></div>
+      <div class="panel-head">
+        <h2 id="hotTitle"></h2>
+        <select id="metricSel" class="fb-sel" style="margin:0"></select>
+      </div>
       <div class="panel-body">
-        <div class="filters">
-          <label class="fb-field"><span id="fromLbl"></span><input id="fFrom" class="fb-date" type="date"></label>
-          <label class="fb-field"><span id="toLbl"></span><input id="fTo" class="fb-date" type="date"></label>
-          <select id="metricSel" class="fb-sel"></select>
-        </div>
         <div class="grid-2">
           <div class="chart-box tall"><canvas id="hotChart"></canvas></div>
           <div id="hotTable"></div>
@@ -59,14 +67,15 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=70"></script>
-  <script src="assets/js/auth.js?v=70"></script>
-  <script src="assets/js/common.js?v=70"></script>
-  <script src="assets/js/products-calc.js?v=70"></script>
+  <script src="assets/js/config.js?v=71"></script>
+  <script src="assets/js/auth.js?v=71"></script>
+  <script src="assets/js/common.js?v=71"></script>
+  <script src="assets/js/products-calc.js?v=71"></script>
   <script>
   (function () {
     const D = window.DASH, P = window.DASH_PRODUCTS;
     const $ = id => document.getElementById(id);
+    const fmt = D.fmtMoney, esc = D.esc, num = n => Number(n) || 0;
     D.buildChrome("products");
     $("pgTitle").textContent = D.t("prod_title");
     $("pgSub").textContent = D.t("prod_sub");
@@ -76,39 +85,65 @@
     $("chkHot").textContent = D.t("chk_hot");
     $("fromLbl").textContent = D.t("f_from") + " ";
     $("toLbl").textContent = " " + D.t("f_to") + " ";
+    $("custSearch").placeholder = D.t("prod_search_cust");
 
     // Categories hidden from the page — fixtures/equipment, not sellable products
     // (e.g. عارضات و استاندات = display racks & stands). Add more terms with |.
     const EXCLUDE_CAT = /عارضات|استاندات/;
-    let threshold = 60, metric = "revenue";
+    let threshold = 60, metric = "units";  // management leads with quantities
     let products = [], stockById = {}, costById = {}, nameById = {}, custName = {}, lines = [];
     let frozenChart = null, hotChart = null;
+    const today = D.bagDay(new Date());
 
-    // threshold pills
+    // ---- filter bar ----
+    $("fFrom").value = today.slice(0, 7) + "-01";
+    $("fTo").value = today;
+    ["fFrom", "fTo", "repSel", "citySel"].forEach(id => $(id).addEventListener("change", renderAll));
+    $("custSearch").addEventListener("input", renderAll);
+    $("clrBtn").addEventListener("click", () => {
+      $("repSel").value = ""; $("citySel").value = ""; $("custSearch").value = "";
+      $("fFrom").value = today.slice(0, 7) + "-01"; $("fTo").value = today; renderAll();
+    });
+
+    // threshold pills (frozen window)
     $("thrPills").innerHTML = [30, 60, 90].map(d =>
       `<span class="pill ${d === threshold ? "active" : ""}" data-d="${d}">${d} ${D.t("prod_days")}</span>`).join("");
     $("thrPills").querySelectorAll(".pill").forEach(p => p.addEventListener("click", () => {
       threshold = Number(p.getAttribute("data-d"));
       $("thrPills").querySelectorAll(".pill").forEach(x => x.classList.toggle("active", x === p));
-      renderFrozen();
+      renderAll();
     }));
-    // metric select (revenue / units)
+    // metric select (units default)
     $("metricSel").innerHTML =
-      `<option value="revenue">${D.t("prod_by_revenue")}</option><option value="units">${D.t("prod_by_units")}</option>`;
+      `<option value="units">${D.t("prod_by_units")}</option><option value="revenue">${D.t("prod_by_revenue")}</option>`;
     $("metricSel").addEventListener("change", () => { metric = $("metricSel").value; renderHot(); });
 
-    // date defaults: current month
-    const today = D.bagDay(new Date());
-    $("fFrom").value = today.slice(0, 7) + "-01";
-    $("fTo").value = today;
-    $("fFrom").addEventListener("change", renderHot);
-    $("fTo").addEventListener("change", renderHot);
+    // fill rep/city dropdowns from the loaded lines (preserve current selection)
+    function fillSelects() {
+      const reps = [...new Set(lines.map(l => l.salesperson).filter(Boolean))].sort();
+      const govs = [...new Set(lines.map(l => l.gov).filter(Boolean))].sort();
+      const r = $("repSel").value, c = $("citySel").value;
+      $("repSel").innerHTML = `<option value="">${D.t("prod_all_reps")}</option>` +
+        reps.map(x => `<option value="${esc(x)}"${x === r ? " selected" : ""}>${esc(x)}</option>`).join("");
+      $("citySel").innerHTML = `<option value="">${D.t("prod_all_cities")}</option>` +
+        govs.map(x => `<option value="${esc(x)}"${x === c ? " selected" : ""}>${esc(x)}</option>`).join("");
+    }
 
-    const fmt = D.fmtMoney, esc = D.esc, num = n => Number(n) || 0;
+    // slice lines by rep/customer/city (+ date when useDate). Frozen ignores the
+    // date window (it's today-relative via the threshold); Hot uses it.
+    function sliceLines(useDate) {
+      const rep = $("repSel").value, city = $("citySel").value, cust = $("custSearch").value.trim().toLowerCase();
+      const from = $("fFrom").value, to = D.nextDay($("fTo").value);
+      return lines.filter(l =>
+        (!rep || l.salesperson === rep) &&
+        (!city || l.gov === city) &&
+        (!cust || (custName[l.partner_id] || "").toLowerCase().includes(cust)) &&
+        (!useDate || (l.date_order && l.date_order.slice(0, 10) >= from && l.date_order.slice(0, 10) < to)));
+    }
 
-    function lastSaleMap() {
+    function lastSaleMap(sl) {
       const m = {};
-      for (const l of lines) {
+      for (const l of sl) {
         const t = l.date_order ? new Date(l.date_order).getTime() : 0;
         if (!t) continue;
         if (!m[l.product_id] || t > new Date(m[l.product_id]).getTime()) m[l.product_id] = l.date_order;
@@ -116,42 +151,47 @@
       return m;
     }
 
-    function renderKpis(frozen) {
-      const totalVal = Object.values(stockById).reduce((a, s) => a + num(s.stock_value), 0);
-      const frozenVal = frozen.reduce((a, r) => a + num(r.stock_value), 0);
-      const pct = totalVal ? Math.round(frozenVal / totalVal * 100) : 0;
-      // top seller in the current hot window
-      const agg = P.aggregateLines(hotLines(), costById);
-      const top = agg.byProduct[0];
-      const topName = top ? (nameById[top.product_id] || ("#" + top.product_id)) : "—";
+    function frozenRows() {
+      const sl = sliceLines(false); // rep/customer/city, all dates
+      return P.classifyFrozen(products, stockById, lastSaleMap(sl), threshold, Date.now())
+        .filter(r => r.frozen).sort((a, b) => b.on_hand_qty - a.on_hand_qty); // biggest stuck QTY first
+    }
+
+    function renderKpis() {
+      const sold = sliceLines(true);
+      const unitsSold = sold.reduce((a, l) => a + num(l.qty), 0);
+      const unitsStock = Object.values(stockById).reduce((a, s) => a + num(s.on_hand_qty), 0);
+      const frozen = frozenRows();
+      const frozenUnits = frozen.reduce((a, r) => a + num(r.on_hand_qty), 0);
+      const top = P.aggregateLines(sold, costById).byProduct.slice().sort((a, b) => b.units - a.units)[0];
       const kpi = (cls, label, val, sub) =>
         `<div class="kpi ${cls}"><div class="kpi-l">${label}</div><div class="kpi-n">${val}</div><div class="kpi-sub">${sub || "&nbsp;"}</div></div>`;
       $("kpiRow").innerHTML =
-        kpi("", D.t("prod_kpi_stockval"), fmt(totalVal), "&nbsp;") +
-        kpi("k-amb", D.t("prod_kpi_frozenval"), fmt(frozenVal), "&nbsp;") +
-        kpi("k-amb", D.t("prod_kpi_frozensku"), D.fmtNum(frozen.length), `${pct}% ${D.t("prod_kpi_frozenpct")}`) +
-        kpi("k-grn", D.t("prod_kpi_top"), esc(topName), top ? fmt(top.revenue) : "&nbsp;");
+        kpi("k-grn", D.t("prod_kpi_units_sold"), D.fmtNum(Math.round(unitsSold)), "&nbsp;") +
+        kpi("", D.t("prod_kpi_units_stock"), D.fmtNum(Math.round(unitsStock)), "&nbsp;") +
+        kpi("k-amb", D.t("prod_kpi_frozensku"), D.fmtNum(frozen.length),
+          `${D.fmtNum(Math.round(frozenUnits))} ${D.t("prod_kpi_frozen_units")}`) +
+        kpi("k-vio", D.t("prod_kpi_top"), top ? esc(nameById[top.product_id] || ("#" + top.product_id)) : "—",
+          top ? `${D.fmtNum(Math.round(top.units))} ${D.t("prod_th_units")}` : "&nbsp;");
     }
 
     function renderFrozen() {
       const now = Date.now();
-      const all = P.classifyFrozen(products, stockById, lastSaleMap(), threshold, now);
-      const frozen = all.filter(r => r.frozen).sort((a, b) => b.stock_value - a.stock_value);
-      renderKpis(frozen);
+      const frozen = frozenRows();
+      const slAll = sliceLines(false);
 
-      // category chart (frozen value by category)
+      // category chart — frozen QUANTITY by category
       const byCat = {};
-      frozen.forEach(r => { const c = r.category || "—"; byCat[c] = (byCat[c] || 0) + num(r.stock_value); });
+      frozen.forEach(r => { const c = r.category || "—"; byCat[c] = (byCat[c] || 0) + num(r.on_hand_qty); });
       const cats = Object.entries(byCat).sort((a, b) => b[1] - a[1]).slice(0, 10);
       if (frozenChart) frozenChart.destroy();
       frozenChart = new Chart($("frozenChart"), {
         type: "bar",
         data: { labels: cats.map(c => c[0]), datasets: [{ data: cats.map(c => c[1]), backgroundColor: "#f0a020" }] },
         options: { indexAxis: "y", plugins: { legend: { display: false } },
-          scales: { x: { ticks: { callback: v => fmt(v) } } }, responsive: true, maintainAspectRatio: false }
+          scales: { x: { ticks: { callback: v => D.fmtNum(v) } } }, responsive: true, maintainAspectRatio: false }
       });
 
-      // table
       $("frozenTable").innerHTML = frozen.length ? `
         <table class="dt"><thead><tr>
           <th>${D.t("prod_th_product")}</th><th>${D.t("prod_th_category")}</th>
@@ -160,13 +200,13 @@
           <th>${D.t("prod_th_velocity")}</th>
         </tr></thead><tbody>
         ${frozen.map(r => {
-          const vel = P.productVelocity(lines, r.product_id, 90, now);
+          const vel = P.productVelocity(slAll, r.product_id, 90, now);
           return `<tr class="prod-row" data-pid="${esc(r.product_id)}" style="cursor:pointer">
             <td>${esc(r.name || ("#" + r.product_id))}
               ${r.never_sold ? `<span class="badge b-crit">${D.t("prod_never_sold")}</span>` : ""}</td>
             <td class="muted">${esc(r.category || "—")}</td>
-            <td>${D.fmtNum(Math.round(r.on_hand_qty))}</td>
-            <td class="amt">${fmt(r.stock_value)}</td>
+            <td><b>${D.fmtNum(Math.round(r.on_hand_qty))}</b></td>
+            <td class="amt muted">${fmt(r.stock_value)}</td>
             <td class="muted">${r.last_sale ? D.fmtDate(r.last_sale) : "—"}</td>
             <td>${r.days_idle == null ? "—" : (r.days_idle + D.t("prod_days"))}</td>
             <td class="muted">${vel ? vel.toFixed(1) : "0"}</td>
@@ -180,7 +220,7 @@
         const det = $("frozenTable").querySelector(`.prod-detail[data-for="${pid}"]`);
         if (!det) return;
         if (det.style.display === "none") {
-          const mk = P.productMarkets(lines, isNaN(pid) ? pid : Number(pid));
+          const mk = P.productMarkets(slAll, isNaN(pid) ? pid : Number(pid));
           det.querySelector("td").innerHTML = `<b>${D.t("prod_where_sells")}:</b> ` +
             (mk.length ? mk.map(m => `${esc(m.gov)} (${D.fmtNum(Math.round(m.units))})`).join(" · ")
                        : `<span class="muted">${D.t("prod_no_lines")}</span>`);
@@ -189,16 +229,10 @@
       }));
     }
 
-    function hotLines() {
-      const from = $("fFrom").value, to = D.nextDay($("fTo").value);
-      return lines.filter(l => l.date_order && l.date_order.slice(0, 10) >= from && l.date_order.slice(0, 10) < to);
-    }
-
     function renderHot() {
-      const hl = hotLines();
-      const agg = P.aggregateLines(hl, costById);
-      const top = agg.byProduct.slice(0, 15);
-      renderKpis(P.classifyFrozen(products, stockById, lastSaleMap(), threshold, Date.now()).filter(r => r.frozen));
+      const sl = sliceLines(true);
+      const agg = P.aggregateLines(sl, costById);
+      const top = agg.byProduct.slice().sort((a, b) => metric === "units" ? b.units - a.units : b.revenue - a.revenue).slice(0, 15);
 
       if (hotChart) hotChart.destroy();
       hotChart = new Chart($("hotChart"), {
@@ -217,9 +251,9 @@
         </tr></thead><tbody>
         ${top.map(r => `<tr class="hot-row" data-pid="${esc(r.product_id)}" style="cursor:pointer">
           <td>${esc(nameById[r.product_id] || ("#" + r.product_id))}</td>
-          <td>${D.fmtNum(Math.round(r.units))}</td>
-          <td class="amt">${fmt(r.revenue)}</td>
-          <td class="amt">${fmt(r.margin)}</td>
+          <td><b>${D.fmtNum(Math.round(r.units))}</b></td>
+          <td class="amt muted">${fmt(r.revenue)}</td>
+          <td class="amt muted">${fmt(r.margin)}</td>
           <td class="muted">${r.mix_pct.toFixed(1)}%</td>
         </tr>`).join("")}
         </tbody></table>` : `<div class="empty">${D.t("prod_no_lines")}</div>`;
@@ -231,7 +265,7 @@
           <div class="panel-head"><h2 style="font-size:14px">${title}</h2></div>
           <div class="panel-body" style="padding:0"><table class="dt"><tbody>
           ${rows.slice(0, 10).map(x => `<tr><td>${esc(labelFn(x))}</td>
-            <td>${D.fmtNum(Math.round(x.units))}</td><td class="amt">${fmt(x.revenue)}</td></tr>`).join("")}
+            <td><b>${D.fmtNum(Math.round(x.units))}</b></td><td class="amt muted">${fmt(x.revenue)}</td></tr>`).join("")}
           </tbody></table></div></div>`;
         $("drillPanel").innerHTML = `<div class="grid-2">
           ${list(D.t("prod_top_customers"), d.byCustomer, x => custName[x.partner_id] || ("#" + x.partner_id))}
@@ -241,16 +275,18 @@
       }));
     }
 
+    function renderAll() { renderKpis(); renderFrozen(); renderHot(); }
+
     async function tick() {
       try {
         const from180 = (() => { const d = new Date(today + "T00:00:00"); d.setDate(d.getDate() - 180); return d.toISOString().slice(0, 10); })();
         const [prd, stk, ln, cst] = await Promise.all([
           D.sbGetAll("dashboard_products?select=product_id,name,category,brand,cost&order=product_id.desc"),
           D.sbGetAll("dashboard_stock?select=product_id,on_hand_qty,stock_value&order=product_id.desc"),
-          D.sbGetAll(`dashboard_order_lines?select=line_id,product_id,qty,price_subtotal,date_order,partner_id,city,gov&state=in.(sale,done)&date_order=gte.${from180}&order=line_id.desc`),
+          D.sbGetAll(`dashboard_order_lines?select=line_id,product_id,qty,price_subtotal,date_order,partner_id,city,gov,salesperson&state=in.(sale,done)&date_order=gte.${from180}&order=line_id.desc`),
           D.sbGetAll("dashboard_customers?select=partner_id,complete_name&order=partner_id.desc")
         ]);
-        // drop excluded categories from every part of the page (frozen, hot, stock KPI)
+        // drop excluded categories from every part of the page
         const excluded = new Set((prd || []).filter(p => EXCLUDE_CAT.test(String(p.category || ""))).map(p => p.product_id));
         products = (prd || []).filter(p => !excluded.has(p.product_id));
         lines = (ln || []).filter(l => !excluded.has(l.product_id));
@@ -259,11 +295,10 @@
         products.forEach(p => { costById[p.product_id] = num(p.cost); nameById[p.product_id] = p.name; });
         (cst || []).forEach(c => { custName[c.partner_id] = c.complete_name; });
 
-        const partial = lines.length < 500 || products.length === 0;
-        $("partialWarn").textContent = partial ? D.t("prod_warn_partial") : "";
+        $("partialWarn").textContent = (lines.length < 500 || products.length === 0) ? D.t("prod_warn_partial") : "";
         D.setUpdated();
-        renderFrozen();
-        renderHot();
+        fillSelects();
+        renderAll();
       } catch (e) {
         $("frozenTable").innerHTML = `<div class="err">${D.t("error_load")}</div>`;
       }
