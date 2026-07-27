@@ -77,6 +77,9 @@
     $("fromLbl").textContent = D.t("f_from") + " ";
     $("toLbl").textContent = " " + D.t("f_to") + " ";
 
+    // Categories hidden from the page — fixtures/equipment, not sellable products
+    // (e.g. عارضات و استاندات = display racks & stands). Add more terms with |.
+    const EXCLUDE_CAT = /عارضات|استاندات/;
     let threshold = 60, metric = "revenue";
     let products = [], stockById = {}, costById = {}, nameById = {}, custName = {}, lines = [];
     let frozenChart = null, hotChart = null;
@@ -247,10 +250,12 @@
           D.sbGetAll(`dashboard_order_lines?select=line_id,product_id,qty,price_subtotal,date_order,partner_id,city,gov&state=in.(sale,done)&date_order=gte.${from180}&order=line_id.desc`),
           D.sbGetAll("dashboard_customers?select=partner_id,complete_name&order=partner_id.desc")
         ]);
-        products = prd || [];
-        lines = ln || [];
+        // drop excluded categories from every part of the page (frozen, hot, stock KPI)
+        const excluded = new Set((prd || []).filter(p => EXCLUDE_CAT.test(String(p.category || ""))).map(p => p.product_id));
+        products = (prd || []).filter(p => !excluded.has(p.product_id));
+        lines = (ln || []).filter(l => !excluded.has(l.product_id));
         stockById = {}; costById = {}; nameById = {}; custName = {};
-        (stk || []).forEach(s => { stockById[s.product_id] = s; });
+        (stk || []).forEach(s => { if (!excluded.has(s.product_id)) stockById[s.product_id] = s; });
         products.forEach(p => { costById[p.product_id] = num(p.cost); nameById[p.product_id] = p.name; });
         (cst || []).forEach(c => { custName[c.partner_id] = c.complete_name; });
 
