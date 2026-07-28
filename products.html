@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Products & Warehouse</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=74" />
+  <link rel="stylesheet" href="assets/css/style.css?v=75" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -67,10 +67,10 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=74"></script>
-  <script src="assets/js/auth.js?v=74"></script>
-  <script src="assets/js/common.js?v=74"></script>
-  <script src="assets/js/products-calc.js?v=74"></script>
+  <script src="assets/js/config.js?v=75"></script>
+  <script src="assets/js/auth.js?v=75"></script>
+  <script src="assets/js/common.js?v=75"></script>
+  <script src="assets/js/products-calc.js?v=75"></script>
   <script>
   (function () {
     const D = window.DASH, P = window.DASH_PRODUCTS;
@@ -285,7 +285,7 @@
 
     async function tick() {
       try {
-        const from180 = (() => { const d = new Date(today + "T00:00:00"); d.setDate(d.getDate() - 180); return d.toISOString().slice(0, 10); })();
+        const from180 = (() => { const d = new Date(today + "T00:00:00"); d.setDate(d.getDate() - 120); return d.toISOString().slice(0, 10); })();
         const [prd, stk, ln, cst] = await Promise.all([
           D.sbGetAll("dashboard_products?select=product_id,name,category,brand,cost&order=product_id.desc"),
           D.sbGetAll("dashboard_stock?select=product_id,on_hand_qty,stock_value&order=product_id.desc"),
@@ -316,7 +316,10 @@
       }
     }
     tick();
-    setInterval(tick, D.cfg.POLL_MS);
+    // This page pulls a large line set; auto-refresh every 20 min (matching the
+    // sync cadence) instead of every 3 min so it doesn't re-download + reparse
+    // ~100k rows constantly. The 🔄 button still forces an immediate refresh.
+    setInterval(tick, 20 * 60 * 1000);
   })();
   </script>
 </body>
