@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Products & Warehouse</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=73" />
+  <link rel="stylesheet" href="assets/css/style.css?v=74" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -67,10 +67,10 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=73"></script>
-  <script src="assets/js/auth.js?v=73"></script>
-  <script src="assets/js/common.js?v=73"></script>
-  <script src="assets/js/products-calc.js?v=73"></script>
+  <script src="assets/js/config.js?v=74"></script>
+  <script src="assets/js/auth.js?v=74"></script>
+  <script src="assets/js/common.js?v=74"></script>
+  <script src="assets/js/products-calc.js?v=74"></script>
   <script>
   (function () {
     const D = window.DASH, P = window.DASH_PRODUCTS;
@@ -140,15 +140,14 @@
         (!rep || l.salesperson === rep) &&
         (!city || l.gov === city) &&
         (!cust || String(l.partner_id) === cust) &&
-        (!useDate || (l.date_order && D.bagDay(l.date_order) >= from && D.bagDay(l.date_order) < to)));
+        (!useDate || (l._bday >= from && l._bday < to)));   // _bday precomputed once (Baghdad day)
     }
 
     function lastSaleMap(sl) {
-      const m = {};
+      const ts = {}, m = {};
       for (const l of sl) {
-        const t = l.date_order ? new Date(l.date_order).getTime() : 0;
-        if (!t) continue;
-        if (!m[l.product_id] || t > new Date(m[l.product_id]).getTime()) m[l.product_id] = l.date_order;
+        if (!l._bts) continue;
+        if (ts[l.product_id] == null || l._bts > ts[l.product_id]) { ts[l.product_id] = l._bts; m[l.product_id] = l.date_order; }
       }
       return m;
     }
@@ -182,6 +181,11 @@
       const frozen = frozenRows();
       const slAll = sliceLines(false);
 
+      // velocity (units/mo, trailing 90d) for ALL products in one pass — not
+      // per-row (which re-scanned every line for each frozen product).
+      const velFloor = now - 90 * 86400000, velMap = {};
+      for (const l of slAll) if (l._bts >= velFloor) velMap[l.product_id] = (velMap[l.product_id] || 0) + num(l.qty);
+
       // category chart — frozen QUANTITY by category
       const byCat = {};
       frozen.forEach(r => { const c = r.category || "—"; byCat[c] = (byCat[c] || 0) + num(r.on_hand_qty); });
@@ -202,7 +206,7 @@
           <th>${D.t("prod_th_velocity")}</th>
         </tr></thead><tbody>
         ${frozen.map(r => {
-          const vel = P.productVelocity(slAll, r.product_id, 90, now);
+          const vel = (velMap[r.product_id] || 0) / 3;  // 90d units ÷ 3 = units/mo
           return `<tr class="prod-row" data-pid="${esc(r.product_id)}" style="cursor:pointer">
             <td>${esc(r.name || ("#" + r.product_id))}
               ${r.never_sold ? `<span class="badge b-crit">${D.t("prod_never_sold")}</span>` : ""}</td>
@@ -292,6 +296,12 @@
         const excluded = new Set((prd || []).filter(p => EXCLUDE_CAT.test(String(p.category || ""))).map(p => p.product_id));
         products = (prd || []).filter(p => !excluded.has(p.product_id));
         lines = (ln || []).filter(l => !excluded.has(l.product_id));
+        // Precompute each line's Baghdad day + timestamp ONCE here, so the render
+        // hot paths use cheap string/number compares instead of Intl/Date per line.
+        lines.forEach(l => {
+          l._bts = l.date_order ? new Date(l.date_order).getTime() : 0;
+          l._bday = l._bts ? D.bagDay(l.date_order) : "";
+        });
         stockById = {}; costById = {}; nameById = {}; custName = {};
         (stk || []).forEach(s => { if (!excluded.has(s.product_id)) stockById[s.product_id] = s; });
         products.forEach(p => { costById[p.product_id] = num(p.cost); nameById[p.product_id] = p.name; });
