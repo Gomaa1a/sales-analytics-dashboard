@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Products & Warehouse</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=71" />
+  <link rel="stylesheet" href="assets/css/style.css?v=72" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -26,7 +26,7 @@
     <div class="filters" id="filterBar">
       <select id="repSel" class="fb-sel"></select>
       <select id="citySel" class="fb-sel"></select>
-      <input id="custSearch" class="search-box" type="search">
+      <select id="custSel" class="fb-sel"></select>
       <label class="fb-field"><span id="fromLbl"></span><input id="fFrom" class="fb-date" type="date"></label>
       <label class="fb-field"><span id="toLbl"></span><input id="fTo" class="fb-date" type="date"></label>
       <button id="clrBtn" class="fb-clear" type="button">✕</button>
@@ -67,10 +67,10 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=71"></script>
-  <script src="assets/js/auth.js?v=71"></script>
-  <script src="assets/js/common.js?v=71"></script>
-  <script src="assets/js/products-calc.js?v=71"></script>
+  <script src="assets/js/config.js?v=72"></script>
+  <script src="assets/js/auth.js?v=72"></script>
+  <script src="assets/js/common.js?v=72"></script>
+  <script src="assets/js/products-calc.js?v=72"></script>
   <script>
   (function () {
     const D = window.DASH, P = window.DASH_PRODUCTS;
@@ -85,7 +85,6 @@
     $("chkHot").textContent = D.t("chk_hot");
     $("fromLbl").textContent = D.t("f_from") + " ";
     $("toLbl").textContent = " " + D.t("f_to") + " ";
-    $("custSearch").placeholder = D.t("prod_search_cust");
 
     // Categories hidden from the page — fixtures/equipment, not sellable products
     // (e.g. عارضات و استاندات = display racks & stands). Add more terms with |.
@@ -98,10 +97,9 @@
     // ---- filter bar ----
     $("fFrom").value = today.slice(0, 7) + "-01";
     $("fTo").value = today;
-    ["fFrom", "fTo", "repSel", "citySel"].forEach(id => $(id).addEventListener("change", renderAll));
-    $("custSearch").addEventListener("input", renderAll);
+    ["fFrom", "fTo", "repSel", "citySel", "custSel"].forEach(id => $(id).addEventListener("change", renderAll));
     $("clrBtn").addEventListener("click", () => {
-      $("repSel").value = ""; $("citySel").value = ""; $("custSearch").value = "";
+      $("repSel").value = ""; $("citySel").value = ""; $("custSel").value = "";
       $("fFrom").value = today.slice(0, 7) + "-01"; $("fTo").value = today; renderAll();
     });
 
@@ -122,22 +120,26 @@
     function fillSelects() {
       const reps = [...new Set(lines.map(l => l.salesperson).filter(Boolean))].sort();
       const govs = [...new Set(lines.map(l => l.gov).filter(Boolean))].sort();
-      const r = $("repSel").value, c = $("citySel").value;
+      const custs = [...new Set(lines.map(l => l.partner_id).filter(x => x != null))]
+        .map(id => ({ id, name: custName[id] || ("#" + id) })).sort((a, b) => String(a.name).localeCompare(String(b.name)));
+      const r = $("repSel").value, c = $("citySel").value, cu = $("custSel").value;
       $("repSel").innerHTML = `<option value="">${D.t("prod_all_reps")}</option>` +
         reps.map(x => `<option value="${esc(x)}"${x === r ? " selected" : ""}>${esc(x)}</option>`).join("");
       $("citySel").innerHTML = `<option value="">${D.t("prod_all_cities")}</option>` +
         govs.map(x => `<option value="${esc(x)}"${x === c ? " selected" : ""}>${esc(x)}</option>`).join("");
+      $("custSel").innerHTML = `<option value="">${D.t("prod_all_cust")}</option>` +
+        custs.map(x => `<option value="${x.id}"${String(x.id) === cu ? " selected" : ""}>${esc(x.name)}</option>`).join("");
     }
 
     // slice lines by rep/customer/city (+ date when useDate). Frozen ignores the
     // date window (it's today-relative via the threshold); Hot uses it.
     function sliceLines(useDate) {
-      const rep = $("repSel").value, city = $("citySel").value, cust = $("custSearch").value.trim().toLowerCase();
+      const rep = $("repSel").value, city = $("citySel").value, cust = $("custSel").value;
       const from = $("fFrom").value, to = D.nextDay($("fTo").value);
       return lines.filter(l =>
         (!rep || l.salesperson === rep) &&
         (!city || l.gov === city) &&
-        (!cust || (custName[l.partner_id] || "").toLowerCase().includes(cust)) &&
+        (!cust || String(l.partner_id) === cust) &&
         (!useDate || (l.date_order && l.date_order.slice(0, 10) >= from && l.date_order.slice(0, 10) < to)));
     }
 
