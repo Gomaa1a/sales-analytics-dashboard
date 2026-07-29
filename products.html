@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Products & Warehouse</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=75" />
+  <link rel="stylesheet" href="assets/css/style.css?v=76" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -67,10 +67,10 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=75"></script>
-  <script src="assets/js/auth.js?v=75"></script>
-  <script src="assets/js/common.js?v=75"></script>
-  <script src="assets/js/products-calc.js?v=75"></script>
+  <script src="assets/js/config.js?v=76"></script>
+  <script src="assets/js/auth.js?v=76"></script>
+  <script src="assets/js/common.js?v=76"></script>
+  <script src="assets/js/products-calc.js?v=76"></script>
   <script>
   (function () {
     const D = window.DASH, P = window.DASH_PRODUCTS;
@@ -267,17 +267,27 @@
       $("hotTable").querySelectorAll(".hot-row").forEach(row => row.addEventListener("click", () => {
         const pid = row.getAttribute("data-pid");
         const d = agg.drill(isNaN(pid) ? pid : Number(pid));
-        const list = (title, rows, labelFn) => `<div class="panel" style="margin:0">
+        const list = (title, rows, kind, labelFn, valFn) => `<div class="panel" style="margin:0">
           <div class="panel-head"><h2 style="font-size:14px">${title}</h2></div>
           <div class="panel-body" style="padding:0"><table class="dt"><tbody>
-          ${rows.slice(0, 10).map(x => `<tr><td>${esc(labelFn(x))}</td>
+          ${rows.slice(0, 10).map(x => `<tr class="drill-row" data-kind="${kind}" data-val="${esc(String(valFn(x)))}" style="cursor:pointer">
+            <td>${esc(labelFn(x))}</td>
             <td><b>${D.fmtNum(Math.round(x.units))}</b></td><td class="amt muted">${fmt(x.revenue)}</td></tr>`).join("")}
           </tbody></table></div></div>`;
         $("drillPanel").innerHTML = `<div class="grid-2">
-          ${list(D.t("prod_top_customers"), d.byCustomer, x => custName[x.partner_id] || ("#" + x.partner_id))}
-          ${list(D.t("prod_top_cities"), d.byGov, x => x.gov)}
+          ${list(D.t("prod_top_customers"), d.byCustomer, "cust", x => custName[x.partner_id] || ("#" + x.partner_id), x => x.partner_id)}
+          ${list(D.t("prod_top_cities"), d.byGov, "gov", x => x.gov, x => x.gov)}
         </div>`;
         $("drillPanel").style.display = "";
+        // click a customer / city → filter the whole page to it, so the Hot table
+        // then shows THAT customer's / city's products (units, revenue, margin, mix)
+        $("drillPanel").querySelectorAll(".drill-row").forEach(dr => dr.addEventListener("click", () => {
+          const kind = dr.getAttribute("data-kind"), val = dr.getAttribute("data-val");
+          if (kind === "cust") $("custSel").value = val; else $("citySel").value = val;
+          $("drillPanel").style.display = "none";
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          renderAll();
+        }));
       }));
     }
 
