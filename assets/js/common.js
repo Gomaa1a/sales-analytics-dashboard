@@ -950,10 +950,7 @@
     { table: "dashboard_invoices",  key: "src_invoices",  feeds: ["src_f_inv_today", "src_f_inv_month", "src_f_debt"] },
     { table: "dashboard_payments",  key: "src_payments",  feeds: ["src_f_cash", "src_f_collections", "src_f_pay_tables"] },
     { table: "dashboard_orders",    key: "src_orders",    feeds: ["src_f_orders_today", "src_f_charts", "src_f_regions", "src_f_sales"] },
-    { table: "dashboard_customers", key: "src_customers", feeds: ["src_f_names", "src_f_geo"] },
-    { table: "dashboard_products",    key: "src_products", feeds: ["src_f_prod_catalog"] },
-    { table: "dashboard_stock",       key: "src_stock",    feeds: ["src_f_frozen", "src_f_stockval"] },
-    { table: "dashboard_order_lines", key: "src_lines",    feeds: ["src_f_hot", "src_f_lastsale"] }
+    { table: "dashboard_customers", key: "src_customers", feeds: ["src_f_names", "src_f_geo"] }
   ];
   const HIDDEN_SRC_LKEY = "dash_hidden_src";
   let _hiddenSrc = null; // cached Set of hidden table names
@@ -1447,7 +1444,6 @@
     { key: "nav_overview", href: "index.html", id: "overview", group: "main" },
     { key: "nav_regions", href: "regions.html", id: "regions", group: "sales" },
     { key: "nav_sales", href: "salespeople.html", id: "sales", group: "sales" },
-    { key: "nav_products", href: "products.html", id: "products", group: "sales" },
     { key: "nav_collections", href: "collections.html", id: "collections", group: "money" },
     { key: "nav_debt", href: "debt.html", id: "debt", group: "money" },
     { key: "nav_alerts", href: "alerts.html", id: "alerts", group: "risk" },
