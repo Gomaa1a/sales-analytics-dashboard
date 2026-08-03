@@ -19,9 +19,11 @@
 
   /* ------------- pages & role defaults ------------- */
   const PAGE_ORDER = ["overview", "regions", "sales", "collections", "debt", "alerts", "admin"];
+  // Clean URLs (Vercel cleanUrls): pages are addressed without the .html
+  // extension; overview lives at the site root. These are redirect targets.
   const FILE_OF = {
-    overview: "index.html", regions: "regions.html", sales: "salespeople.html",
-    collections: "collections.html", debt: "debt.html", alerts: "alerts.html", admin: "admin.html"
+    overview: "/", regions: "/regions", sales: "/salespeople",
+    collections: "/collections", debt: "/debt", alerts: "/alerts", admin: "/admin"
   };
   // A user's `pages` jsonb overrides these per key; missing keys fall back here.
   const ROLE_DEFAULTS = {
@@ -31,12 +33,14 @@
   };
 
   function pageIdFromLocation() {
-    const f = (location.pathname.split("/").pop() || "").toLowerCase();
-    if (!f || f === "index.html") return "overview";
-    if (f === "salespeople.html") return "sales";
-    if (f === "acknowledgments.html") return "alerts";
-    if (f === "login.html") return "login";
-    return f.replace(/\.html$/, "");
+    // Strip any .html FIRST, then match bare names — so it works whether the
+    // URL is clean (/salespeople, Vercel cleanUrls) or legacy (salespeople.html).
+    const f = (location.pathname.split("/").pop() || "").toLowerCase().replace(/\.html$/, "");
+    if (!f || f === "index") return "overview";
+    if (f === "salespeople") return "sales";
+    if (f === "acknowledgments") return "alerts";
+    if (f === "login") return "login";
+    return f;
   }
   const CURRENT = pageIdFromLocation();
 
@@ -200,7 +204,7 @@
     document.documentElement.style.visibility = "hidden";
     location.replace(url);
   }
-  function toLogin() { clearAll(); redirect("login.html"); }
+  function toLogin() { clearAll(); redirect("/login"); }
 
   // Runs at parse time, before the page's own script:
   //  • no session → login page (synchronous, no content flash)
@@ -216,11 +220,11 @@
       }
       return;
     }
-    if (!session()) { redirect("login.html"); return; }
+    if (!session()) { redirect("/login"); return; }
     const cached = profile();
     if (cached && !canView(CURRENT, cached)) {
       const fa = firstAllowed(cached);
-      redirect(fa || "login.html");
+      redirect(fa || "/login");
       return;
     }
     ensureToken().then(function (tok) {
@@ -228,7 +232,7 @@
       fetchProfile().then(function (fresh) {
         if (!fresh) { toLogin(); return; }
         if (!fresh.is_active) { toLogin(); return; }
-        if (!canView(CURRENT, fresh)) { redirect(firstAllowed(fresh) || "login.html"); return; }
+        if (!canView(CURRENT, fresh)) { redirect(firstAllowed(fresh) || "/login"); return; }
         logView(CURRENT);
       });
     });

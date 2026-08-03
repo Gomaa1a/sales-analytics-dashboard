@@ -2,7 +2,7 @@
   "name": "Dabboos Sales Command Center",
   "short_name": "Dabboos",
   "description": "Live sales analytics for Dabboos — orders, collections, debt and alerts.",
-  "start_url": "./index.html",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",

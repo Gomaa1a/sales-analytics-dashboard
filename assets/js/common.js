@@ -1450,14 +1450,15 @@
   /* ---------------- chrome (header + nav) ----------------
      Pages are grouped by purpose; the nav draws a subtle divider between groups:
      main · sales (geography + people) · money (cash in + owed) · risk (alerts). */
+  // Clean URLs (Vercel cleanUrls): no .html extension; overview is the root.
   const PAGES = [
-    { key: "nav_overview", href: "index.html", id: "overview", group: "main" },
-    { key: "nav_regions", href: "regions.html", id: "regions", group: "sales" },
-    { key: "nav_sales", href: "salespeople.html", id: "sales", group: "sales" },
-    { key: "nav_collections", href: "collections.html", id: "collections", group: "money" },
-    { key: "nav_debt", href: "debt.html", id: "debt", group: "money" },
-    { key: "nav_alerts", href: "alerts.html", id: "alerts", group: "risk" },
-    { key: "nav_admin", href: "admin.html", id: "admin", group: "admin" }
+    { key: "nav_overview", href: "/", id: "overview", group: "main" },
+    { key: "nav_regions", href: "/regions", id: "regions", group: "sales" },
+    { key: "nav_sales", href: "/salespeople", id: "sales", group: "sales" },
+    { key: "nav_collections", href: "/collections", id: "collections", group: "money" },
+    { key: "nav_debt", href: "/debt", id: "debt", group: "money" },
+    { key: "nav_alerts", href: "/alerts", id: "alerts", group: "risk" },
+    { key: "nav_admin", href: "/admin", id: "admin", group: "admin" }
   ];
 
   function renderSoundBtn() {
