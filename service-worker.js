@@ -8,7 +8,7 @@
      - Same-origin app shell   -> network-first, cache fallback (offline).
      - CDN assets (Chart.js)   -> cache-first (URLs are versioned).
    ============================================================ */
-const VERSION = "v77";
+const VERSION = "v78";
 const CACHE = "dabboos-" + VERSION;
 
 self.addEventListener("install", () => {
@@ -42,7 +42,7 @@ self.addEventListener("fetch", (e) => {
           return res;
         })
         .catch(() =>
-          caches.match(req).then(m => m || (req.mode === "navigate" ? caches.match("index.html") : undefined)))
+          caches.match(req).then(m => m || (req.mode === "navigate" ? caches.match("/") : undefined)))
     );
   } else {
     e.respondWith(
