@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Admin Panel</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=78" />
+  <link rel="stylesheet" href="assets/css/style.css?v=79" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -16,6 +16,9 @@
     .u-table select { padding: 6px 8px; border: 1px solid var(--bdr); border-radius: 8px; font: inherit; font-size: 12.5px; background: #fff; }
     .pg-checks { display: flex; flex-wrap: wrap; gap: 4px 10px; max-width: 420px; }
     .pg-checks label { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--ink2); white-space: nowrap; cursor: pointer; }
+    .scope-box summary { cursor: pointer; font-size: 12.5px; color: var(--acc); font-weight: 600; white-space: nowrap; }
+    .scope-list { display: flex; flex-wrap: wrap; gap: 4px 10px; max-width: 320px; max-height: 150px; overflow: auto; margin-top: 6px; padding: 7px 9px; border: 1px solid var(--bdr); border-radius: 8px; background: var(--surface2); }
+    .scope-list label { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--ink2); white-space: nowrap; cursor: pointer; }
     .save-btn { padding: 7px 14px; border: none; border-radius: 8px; background: var(--acc); color: #fff; font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
     .save-btn:hover { background: var(--acc2); }
     .save-btn:disabled { opacity: .5; cursor: wait; }
@@ -45,6 +48,7 @@
           <label><span id="nuNameLbl"></span><input id="nuName" type="text" autocomplete="off" /></label>
           <label><span id="nuPassLbl"></span><input id="nuPass" type="text" autocomplete="off" minlength="6" required /></label>
           <label><span id="nuRoleLbl"></span><select id="nuRole"></select></label>
+          <label style="align-self:center"><span id="nuScopeLbl"></span><div id="nuScope"></div></label>
           <button class="save-btn" id="nuBtn" type="submit" style="padding:10px 18px"></button>
         </form>
         <div class="pw-note" id="pwNote"></div>
@@ -92,9 +96,9 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=78"></script>
-  <script src="assets/js/auth.js?v=78"></script>
-  <script src="assets/js/common.js?v=78"></script>
+  <script src="assets/js/config.js?v=79"></script>
+  <script src="assets/js/auth.js?v=79"></script>
+  <script src="assets/js/common.js?v=79"></script>
   <script>
   (function () {
     const D = window.DASH, A = window.DASH_AUTH;
@@ -116,6 +120,7 @@
     $("nuNameLbl").textContent = D.t("admin_fullname");
     $("nuPassLbl").textContent = D.t("admin_password");
     $("nuRoleLbl").textContent = D.t("admin_role");
+    $("nuScopeLbl").textContent = D.t("admin_scope");
     $("nuBtn").textContent = D.t("admin_create_btn");
     $("pwNote").textContent = D.t("admin_pw_note");
 
@@ -132,6 +137,36 @@
     /* ---------------- users ---------------- */
     const me = A.profile();
     let users = [];
+    let REPS = [];   // salesperson master: [{ user_id, name }]
+
+    // "Attached salespersons" control: a collapsible checkbox list of reps.
+    // None checked = full access (scope_user_ids = null). The DB (RLS) enforces
+    // the restriction; this only records the admin's choice.
+    function scopeSummary(n) { return n ? (n + " " + D.t("admin_scope_reps")) : D.t("admin_scope_all"); }
+    function scopeChecksHtml(selected) {
+      const sel = new Set((selected || []).map(Number));
+      return `<details class="scope-box"><summary>${scopeSummary(sel.size)}</summary>
+        <div class="scope-list">
+          ${REPS.map(r => `<label><input type="checkbox" class="scope-rep" value="${D.esc(r.user_id)}"${sel.has(Number(r.user_id)) ? " checked" : ""}> ${D.esc(r.name)}</label>`).join("")
+            || `<span class="muted" style="font-size:12px">${D.t("admin_scope_none")}</span>`}
+        </div></details>`;
+    }
+    function readScope(container) {
+      const ids = [...container.querySelectorAll(".scope-rep:checked")].map(cb => Number(cb.value));
+      return ids.length ? ids : null;
+    }
+    function wireScope(box) {   // live-update the summary as boxes toggle
+      const det = box.querySelector(".scope-box"); if (!det) return;
+      det.addEventListener("change", () => {
+        det.querySelector("summary").textContent =
+          scopeSummary(det.querySelectorAll(".scope-rep:checked").length);
+      });
+    }
+    async function loadReps() {
+      try { REPS = await D.loadSalespeopleMaster() || []; } catch (e) { REPS = []; }
+      $("nuScope").innerHTML = scopeChecksHtml([]);
+      wireScope($("nuScope"));
+    }
 
     function effPages(u) {
       const out = {};
@@ -148,6 +183,7 @@
           <thead><tr>
             <th>${D.t("admin_user_col")}</th><th>${D.t("admin_fullname")}</th>
             <th>${D.t("admin_role")}</th><th>${D.t("admin_pages")}</th>
+            <th>${D.t("admin_scope")}</th>
             <th>${D.t("admin_active")}</th><th></th>
           </tr></thead>
           <tbody>
@@ -164,6 +200,7 @@
                 ${A.PAGE_ORDER.map(pid =>
                   `<label><input type="checkbox" class="u-pg" data-pid="${pid}"${eff[pid] ? " checked" : ""}${self && pid === "admin" ? " disabled" : ""}> ${pageLabel(pid)}</label>`).join("")}
               </div></td>
+              <td class="u-scope">${scopeChecksHtml(u.scope_user_ids)}</td>
               <td style="text-align:center"><input type="checkbox" class="u-active"${u.is_active ? " checked" : ""}${self ? " disabled" : ""}></td>
               <td><button class="save-btn u-save" type="button">${D.t("admin_save")}</button></td>
             </tr>`;
@@ -172,6 +209,7 @@
         </table>` : `<div class="empty">${D.t("tr_empty")}</div>`;
 
       document.querySelectorAll("#usersBox tr[data-uid]").forEach(tr => {
+        wireScope(tr.querySelector(".u-scope"));
         // changing the role resets the page checkboxes to that role's defaults
         tr.querySelector(".u-role").addEventListener("change", e => {
           const d = A.ROLE_DEFAULTS[e.target.value] || {};
@@ -187,6 +225,7 @@
               full_name: tr.querySelector(".u-name").value.trim() || null,
               role: tr.querySelector(".u-role").value,
               pages: pages,
+              scope_user_ids: readScope(tr.querySelector(".u-scope")),
               is_active: tr.querySelector(".u-active").checked,
               updated_at: new Date().toISOString()
             });
@@ -201,7 +240,7 @@
     }
 
     async function loadUsers() {
-      users = await D.sbGetAll("dash_users?select=user_id,username,full_name,role,pages,is_active&order=created_at.asc");
+      users = await D.sbGetAll("dash_users?select=user_id,username,full_name,role,pages,is_active,scope_user_ids&order=created_at.asc");
       renderUsers();
     }
 
@@ -216,9 +255,14 @@
         const uid = await A.signUp(username, $("nuPass").value, $("nuName").value.trim(), role);
         // the DB trigger creates the profile INACTIVE — activate it now
         const q = uid ? "user_id=eq." + encodeURIComponent(uid) : "username=eq." + encodeURIComponent(username);
-        await D.sbWrite("PATCH", "dash_users?" + q, { is_active: true, role: role, updated_at: new Date().toISOString() });
+        await D.sbWrite("PATCH", "dash_users?" + q, {
+          is_active: true, role: role,
+          scope_user_ids: readScope($("nuScope")),
+          updated_at: new Date().toISOString()
+        });
         D.toast("<b>" + D.t("admin_created") + "</b>");
         $("nuUser").value = ""; $("nuName").value = ""; $("nuPass").value = "";
+        $("nuScope").innerHTML = scopeChecksHtml([]); wireScope($("nuScope"));
         await loadUsers();
       } catch (ex) {
         const dup = /already|registered|exists/i.test(String(ex.message));
@@ -334,7 +378,10 @@
     }
 
     async function tick() {
-      try { await Promise.all([loadUsers(), renderSources(), loadTraffic()]); }
+      try {
+        await loadReps();   // users table + create form need the rep list first
+        await Promise.all([loadUsers(), renderSources(), loadTraffic()]);
+      }
       catch (e) { $("usersBox").innerHTML = `<div class="err">${D.t("error_load")}</div>`; }
     }
     tick();
