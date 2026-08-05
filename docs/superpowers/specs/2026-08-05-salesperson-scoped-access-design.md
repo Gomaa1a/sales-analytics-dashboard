@@ -104,13 +104,15 @@ an unassigned order belongs to no rep's team.
   rows.
 - **Header banner** (in `buildChrome`): when scoped, show
   "Viewing: «rep names»" so the numbers are self-explanatory and trustworthy.
-- **Snapshot-derived widgets** (the Collections 14-day per-rep grid; per-customer
-  DSO trend) read `dashboard_snapshots`, now blocked for scoped users. They must
-  **degrade gracefully** — the fetch returns empty, not an error. Where the same
-  figure can be rebuilt cheaply from raw (the Collections grid from raw
-  `dashboard_payments`, which carry `user_id` + `date` + `amount`), recompute it
-  so the page stays complete; otherwise hide the widget with a small
-  "not available in team view" note. Never crash.
+- **Snapshot-derived widgets** (Collections 14-day per-rep grid, rep-debt, DSO):
+  IMPLEMENTATION NOTE — verified during build that `D.api("rep_collections" /
+  "rep_debt" / "collections")` are **raw-table adapters** (they build from
+  `dashboard_orders` / `dashboard_payments` / `dashboard_invoices` /
+  `dashboard_customers`, per the "used to be n8n snapshots" comment in
+  `common.js`). Every source carries `user_id`, so these widgets **auto-scope
+  under RLS with no code change** — no degradation or recompute needed. The
+  `dashboard_snapshots` / `dashboard_monthly` tables are not read by the current
+  front-end; blocking scoped users from them is harmless defence-in-depth.
 
 ## Security & edge cases
 - RLS is the control; every UI hide/banner is cosmetic.

@@ -376,6 +376,11 @@
       role_management: "إدارة",
       role_alerts: "تنبيهات فقط",
       admin_pages: "الصفحات المسموح بها",
+      admin_scope: "المندوبون المرتبطون",
+      admin_scope_all: "كل المندوبين",
+      admin_scope_reps: "مندوب",
+      admin_scope_none: "لا يوجد مندوبون",
+      scope_viewing: "تعرض أرقام المندوبين:",
       admin_user_col: "المستخدم",
       admin_fullname: "الاسم الكامل",
       admin_password: "كلمة المرور (٦ أحرف على الأقل)",
@@ -774,6 +779,11 @@
       role_management: "Management",
       role_alerts: "Alerts only",
       admin_pages: "Allowed pages",
+      admin_scope: "Attached salespersons",
+      admin_scope_all: "Full access",
+      admin_scope_reps: "reps",
+      admin_scope_none: "No salespersons found",
+      scope_viewing: "Viewing numbers for:",
       admin_user_col: "User",
       admin_fullname: "Full name",
       admin_password: "Password (min 6 characters)",
@@ -1519,9 +1529,38 @@
       if (lo) lo.addEventListener("click", () => window.DASH_AUTH.signOut());
       renderSoundBtn();
       setUpdated(); // paint "synced from Odoo" now; pages refresh it on each poll
+      paintScopeBanner(header);
     }
     // hide any panels whose source table an admin has switched off (global)
     applyDataSourceVisibility();
+  }
+
+  // Scoped-viewer banner: when this login is restricted to specific
+  // salespersons, show it plainly under the header so the numbers are
+  // self-explanatory. RLS is the actual control — this is only the honest
+  // label. Rep names are resolved async from the salesperson master.
+  function paintScopeBanner(header) {
+    const A = window.DASH_AUTH;
+    const scoped = A && A.isScoped && A.isScoped();
+    let banner = document.getElementById("scopeBanner");
+    if (!scoped) { if (banner) banner.remove(); return; }
+    if (!banner) {
+      banner = document.createElement("div");
+      banner.id = "scopeBanner";
+      banner.className = "scope-banner";
+      banner.setAttribute("style",
+        "padding:7px 16px;background:#fff7ed;border-bottom:1px solid #fed7aa;" +
+        "color:#9a3412;font-size:12.5px;font-weight:600;line-height:1.4;");
+      header.insertAdjacentElement("afterend", banner);
+    }
+    const ids = A.scopeIds() || [];
+    banner.innerHTML = `👁 <b>${t("scope_viewing")}</b> <span id="scopeNames">…</span>`;
+    loadSalespeopleMaster().then(reps => {
+      const byId = new Map((reps || []).map(r => [Number(r.user_id), r.name]));
+      const names = ids.map(id => byId.get(Number(id)) || ("#" + id));
+      const el = document.getElementById("scopeNames");
+      if (el) el.innerHTML = names.map(esc).join(isAR() ? "، " : ", ");
+    }).catch(() => {});
   }
 
   // Live "synced from Odoo" clock in the header. Pipelines fire every 20 min,
