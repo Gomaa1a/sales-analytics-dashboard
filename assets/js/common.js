@@ -1919,8 +1919,21 @@
   let _repMaster = null;
   async function loadSalespeopleMaster() {
     if (_repMaster) return _repMaster;
-    try { _repMaster = await sbGet("salespeople?select=user_id,name&order=name"); }
-    catch (e) { _repMaster = []; }
+    let rows;
+    try { rows = await sbGet("salespeople?select=user_id,name&order=name"); }
+    catch (e) { rows = []; }
+    // Scoped viewer: the salespeople master is readable by everyone, so trim it
+    // to the reps this login may actually see. This keeps every filter dropdown
+    // (and the header banner) matching the data the user gets under RLS —
+    // otherwise a scoped user would see all rep names in the filter. Unscoped
+    // users (admins/management) keep the full list.
+    const A = window.DASH_AUTH;
+    const scope = A && A.scopeIds && A.scopeIds();
+    if (scope) {
+      const allow = new Set(scope.map(Number));
+      rows = (rows || []).filter(r => allow.has(Number(r.user_id)));
+    }
+    _repMaster = rows || [];
     return _repMaster;
   }
 
