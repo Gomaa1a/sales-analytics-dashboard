@@ -158,7 +158,7 @@
     if (!s || !s.user_id) return null;
     const res = await fetch(
       BASE + "/rest/v1/dash_users?user_id=eq." + encodeURIComponent(s.user_id) +
-      "&select=user_id,username,full_name,role,pages,is_active",
+      "&select=user_id,username,full_name,role,pages,is_active,scope_user_ids",
       { headers: headers() });
     if (!res.ok) return null;
     const rows = await res.json().catch(() => null);
@@ -245,6 +245,15 @@
     session: session, profile: profile, fetchProfile: fetchProfile,
     canView: canView, firstAllowed: firstAllowed, toEmail: toEmail,
     currentPage: function () { return CURRENT; },
+    // The salesperson user_ids this login is scoped to, or null = full access.
+    // RLS already filters the data; the UI uses this only for cosmetics
+    // (a "Viewing: <reps>" banner, degrading snapshot-only widgets).
+    scopeIds: function () {
+      const p = profile();
+      const a = p && p.scope_user_ids;
+      return (Array.isArray(a) && a.length) ? a : null;
+    },
+    isScoped: function () { return this.scopeIds() != null; },
     ROLE_DEFAULTS: ROLE_DEFAULTS, PAGE_ORDER: PAGE_ORDER, FILE_OF: FILE_OF
   };
 })();
