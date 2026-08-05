@@ -11,7 +11,9 @@
 --     behaviour). Every existing user stays NULL, so nothing changes for them.
 --   • dash_scope_ids() returns the caller's list (NULL when unrestricted).
 --   • Each data table's read policy gains one clause:
---       AND (scope IS NULL OR user_id = ANY(scope))
+--       AND (scope IS NULL OR scope @> array[user_id])
+--     (@> = "array contains" — compares int8[] to int8[]; the `= ANY(subquery)`
+--      form fails with "operator does not exist: bigint = bigint[]").
 --   • The pre-aggregated tables (snapshots, monthly) are summed across ALL reps
 --     and cannot be split, so scoped users are BLOCKED from them.
 --
@@ -72,7 +74,7 @@ create policy orders_read on public.dashboard_orders
     )
     and (
       (select public.dash_scope_ids()) is null
-      or user_id = any ((select public.dash_scope_ids()))
+      or (select public.dash_scope_ids()) @> array[user_id]
     )
   );
 
@@ -83,7 +85,7 @@ create policy payments_read on public.dashboard_payments
     (select public.dash_role()) in ('admin', 'management')
     and (
       (select public.dash_scope_ids()) is null
-      or user_id = any ((select public.dash_scope_ids()))
+      or (select public.dash_scope_ids()) @> array[user_id]
     )
   );
 
@@ -94,7 +96,7 @@ create policy invoices_read on public.dashboard_invoices
     (select public.dash_role()) in ('admin', 'management')
     and (
       (select public.dash_scope_ids()) is null
-      or user_id = any ((select public.dash_scope_ids()))
+      or (select public.dash_scope_ids()) @> array[user_id]
     )
   );
 
@@ -105,7 +107,7 @@ create policy customers_read on public.dashboard_customers
     (select public.dash_role()) in ('admin', 'management')
     and (
       (select public.dash_scope_ids()) is null
-      or user_id = any ((select public.dash_scope_ids()))
+      or (select public.dash_scope_ids()) @> array[user_id]
     )
   );
 
