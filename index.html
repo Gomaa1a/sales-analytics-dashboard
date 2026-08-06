@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Sales Command Center</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=80" />
+  <link rel="stylesheet" href="assets/css/style.css?v=81" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -88,14 +88,19 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=80"></script>
-  <script src="assets/js/auth.js?v=80"></script>
-  <script src="assets/js/common.js?v=80"></script>
+  <script src="assets/js/config.js?v=81"></script>
+  <script src="assets/js/auth.js?v=81"></script>
+  <script src="assets/js/common.js?v=81"></script>
   <script>
   (function () {
-    const D = window.DASH;
+    const D = window.DASH, A = window.DASH_AUTH;
     D.buildChrome("overview");
-    document.getElementById("pgTitle").textContent = D.t("brand");
+    // Personal greeting on the Overview: "Welcome, <name>". Uses the logged-in
+    // profile (full_name preferred, else username). textContent escapes it.
+    const _prof = (A && A.profile) ? A.profile() : null;
+    const _who = _prof ? (_prof.full_name || _prof.username || "") : "";
+    document.getElementById("pgTitle").textContent =
+      _who ? (D.t("ov_welcome") + " " + _who) : D.t("brand");
     document.getElementById("pgSub").textContent = D.t("ov_sub");
     document.getElementById("dayTitle").textContent = D.t("ov_orders_day");
     document.getElementById("weekTitle").textContent = D.t("wk_rev_title");
