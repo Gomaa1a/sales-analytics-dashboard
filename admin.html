@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dabboos — Admin Panel</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=81" />
+  <link rel="stylesheet" href="assets/css/style.css?v=82" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f1729" />
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
@@ -96,9 +96,9 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="assets/js/config.js?v=81"></script>
-  <script src="assets/js/auth.js?v=81"></script>
-  <script src="assets/js/common.js?v=81"></script>
+  <script src="assets/js/config.js?v=82"></script>
+  <script src="assets/js/auth.js?v=82"></script>
+  <script src="assets/js/common.js?v=82"></script>
   <script>
   (function () {
     const D = window.DASH, A = window.DASH_AUTH;
@@ -184,7 +184,8 @@
             <th>${D.t("admin_user_col")}</th><th>${D.t("admin_fullname")}</th>
             <th>${D.t("admin_role")}</th><th>${D.t("admin_pages")}</th>
             <th>${D.t("admin_scope")}</th>
-            <th>${D.t("admin_active")}</th><th></th>
+            <th>${D.t("admin_active")}</th>
+            <th>${D.t("admin_setpw")}</th><th></th>
           </tr></thead>
           <tbody>
           ${users.map(u => {
@@ -202,6 +203,10 @@
               </div></td>
               <td class="u-scope">${scopeChecksHtml(u.scope_user_ids)}</td>
               <td style="text-align:center"><input type="checkbox" class="u-active"${u.is_active ? " checked" : ""}${self ? " disabled" : ""}></td>
+              <td><div style="display:flex;gap:5px;align-items:center">
+                <input type="text" class="u-pw" autocomplete="off" placeholder="${D.t("admin_pw_ph")}" style="width:120px">
+                <button class="save-btn u-setpw" type="button">${D.t("admin_pw_set")}</button>
+              </div></td>
               <td><button class="save-btn u-save" type="button">${D.t("admin_save")}</button></td>
             </tr>`;
           }).join("")}
@@ -210,6 +215,26 @@
 
       document.querySelectorAll("#usersBox tr[data-uid]").forEach(tr => {
         wireScope(tr.querySelector(".u-scope"));
+        // Set password: calls the admin-guarded RPC (SECURITY DEFINER) so the
+        // service_role key never touches the browser. Password is not trimmed
+        // (spaces may be intentional); only a minimum length is enforced here,
+        // and again in the DB function.
+        tr.querySelector(".u-setpw").addEventListener("click", async () => {
+          const inp = tr.querySelector(".u-pw"), b = tr.querySelector(".u-setpw");
+          const pw = inp.value;
+          if (!pw || pw.length < 6) { D.toast("<b>" + D.t("admin_pw_short") + "</b>", "critical"); return; }
+          b.disabled = true;
+          try {
+            await D.sbWrite("POST", "rpc/dash_set_password", {
+              target_id: tr.getAttribute("data-uid"), new_password: pw
+            });
+            inp.value = "";
+            D.toast("<b>" + D.t("admin_pw_done") + "</b>");
+          } catch (e) {
+            D.toast("<b>" + D.t("admin_err") + "</b>", "critical");
+          }
+          b.disabled = false;
+        });
         // changing the role resets the page checkboxes to that role's defaults
         tr.querySelector(".u-role").addEventListener("change", e => {
           const d = A.ROLE_DEFAULTS[e.target.value] || {};
